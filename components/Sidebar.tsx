@@ -10,15 +10,19 @@ import {
   Package, 
   Settings, 
   LogOut,
-  Zap
+  Zap,
+  ShoppingCart,
+  FileText
 } from 'lucide-react';
 
 const menuItems = [
   { name: 'Dashboard', icon: LayoutDashboard, path: '/' },
+  { name: 'POS', icon: ShoppingCart, path: '/pos' },
   { name: 'Customers', icon: Users, path: '/customers' },
   { name: 'Suppliers', icon: Truck, path: '/suppliers' },
   { name: 'New Item', icon: PackagePlus, path: '/new-item' },
   { name: 'All Items', icon: Package, path: '/items' },
+  { name: 'Reports', icon: FileText, path: '/reports' },
   { name: 'Settings', icon: Settings, path: '/settings' },
 ];
 
