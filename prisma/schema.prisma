@@ -1,0 +1,628 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id                 String    @id @default(uuid())
+  name               String
+  address            String?
+  phone              String?
+  email              String    @unique
+  status             String    @default("active") // 'active', 'suspended'
+  subscriptionPlanId String?
+  subscriptionStart  DateTime?
+  nextBillingDate    DateTime?
+  hasUsedTrial       Boolean   @default(false)
+  paymentFingerprint String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  users             User[]
+  stores            Store[]
+  billingHistory    BillingHistory[]
+  subscriptions     Subscription[]
+  customers         Customer[]
+  suppliers         Supplier[]
+  categories        Category[]
+  brands            Brand[]
+  items             Item[]
+  transactions      Transaction[]
+  expenses          Expense[]
+  expenseCategories ExpenseCategory[]
+  units             Unit[]
+  partyBalances     PartyBalance[]
+  cashLedgers       CashLedger[]
+  notifications     Notification[]
+  rolePermissions   RolePermission[]
+  permissionLogs    PermissionAuditLog[]
+  storeInventories  StoreInventory[]
+  stocks            Stock[]
+  stockMovements    StockMovement[]
+}
+
+model Store {
+  id            String    @id @default(uuid())
+  tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id])
+  name          String
+  code          String
+  address       String?
+  phone         String?
+  email         String?
+  managerUserId String?
+  status        String    @default("active")
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  users            User[]
+  customers        Customer[]
+  suppliers        Supplier[]
+  categories       Category[]
+  brands           Brand[]
+  items            Item[]
+  transactions     Transaction[]
+  expenses         Expense[]
+  units            Unit[]
+  partyBalances    PartyBalance[]
+  cashLedgers      CashLedger[]
+  storeInventories StoreInventory[]
+  stocks           Stock[]
+  stockMovements   StockMovement[]
+  rolePermissions  RolePermission[]
+  permissionLogs   PermissionAuditLog[]
+
+  @@unique([tenantId, code])
+}
+
+model User {
+  id             String    @id @default(uuid())
+  firebaseUid    String?   @unique
+  tenantId       String?
+  tenant         Tenant?   @relation(fields: [tenantId], references: [id])
+  name           String
+  email          String    @unique
+  phone          String?
+  password       String?
+  role           String    @default("SALES")
+  status         String    @default("active")
+  deletedAt      DateTime?
+  lastLogin      DateTime?
+  loginAttempts  Int       @default(0)
+  lockedUntil    DateTime?
+  defaultStoreId String?
+  store          Store?    @relation(fields: [defaultStoreId], references: [id])
+
+  permissions         Json? // Array of strings
+  customPermissions   Json? // Array of strings
+  permissionOverrides Json? // { granted: [], revoked: [] }
+  assignedStores      Json? // Array of store IDs
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdCategories Category[]           @relation("CategoryCreator")
+  updatedCategories Category[]           @relation("CategoryUpdater")
+  createdBrands     Brand[]              @relation("BrandCreator")
+  updatedBrands     Brand[]              @relation("BrandUpdater")
+  createdItems      Item[]               @relation("ItemCreator")
+  updatedItems      Item[]               @relation("ItemUpdater")
+  createdCustomers  Customer[]
+  createdSuppliers  Supplier[]
+  createdExpenses   Expense[]
+  transactions      Transaction[]
+  cashLedgers       CashLedger[]
+  stockMovements    StockMovement[]
+  createdUnits      Unit[]               @relation("UnitCreator")
+  updatedUnits      Unit[]               @relation("UnitUpdater")
+  permissionLogs    PermissionAuditLog[]
+
+  @@index([tenantId, email])
+}
+
+model Plan {
+  id             String   @id @default(uuid())
+  name           String   @unique
+  price          Float
+  isTrialPlan    Boolean  @default(false)
+  maxUsers       Int?
+  maxItems       Int?
+  maxBranches    Int?
+  features       Json? // Array of strings
+  durationInDays Int      @default(30)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id           String    @id @default(uuid())
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id])
+  planId       String
+  plan         Plan      @relation(fields: [planId], references: [id])
+  status       String    @default("pending")
+  startDate    DateTime  @default(now())
+  endDate      DateTime
+  autoRenew    Boolean   @default(true)
+  cancelledAt  DateTime?
+  cancelReason String?
+
+  priceSnapshot  Json // { amount, currency, durationInDays }
+  limitsSnapshot Json? // { maxUsers, maxItems, maxBranches }
+
+  isTrial         Boolean   @default(false)
+  trialEndsAt     DateTime?
+  lastPaymentDate DateTime?
+  nextPaymentDate DateTime?
+  paymentStatus   String    @default("pending")
+  notes           String?
+  scheduledPlanId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  billingHistory BillingHistory[]
+  notifications  Notification[]
+}
+
+model BillingHistory {
+  id             String        @id @default(uuid())
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id])
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+  amount         Float
+  currency       String        @default("USD")
+  status         String        @default("pending")
+  paymentMethod  String?
+  paymentDetails Json? // { transactionId, paymentGateway, paidAt }
+  invoiceUrl     String?
+  billingDate    DateTime      @default(now())
+  description    String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model Category {
+  id          String     @id @default(uuid())
+  tenantId    String
+  tenant      Tenant     @relation(fields: [tenantId], references: [id])
+  storeId     String
+  store       Store      @relation(fields: [storeId], references: [id])
+  name        String
+  description String?
+  parentId    String?
+  parent      Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryHierarchy")
+  level       Int        @default(0)
+  path        String     @default("")
+  icon        String?
+  color       String?
+  sortOrder   Int        @default(0)
+  status      String     @default("active")
+  deletedAt   DateTime?
+
+  createdById String?
+  createdBy   User?   @relation("CategoryCreator", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?   @relation("CategoryUpdater", fields: [updatedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items Item[]
+
+  @@unique([tenantId, storeId, name])
+}
+
+model Unit {
+  id               String    @id @default(uuid())
+  tenantId         String
+  tenant           Tenant    @relation(fields: [tenantId], references: [id])
+  storeId          String
+  store            Store     @relation(fields: [storeId], references: [id])
+  name             String
+  symbol           String
+  description      String?
+  category         String // weight, count, volume, etc.
+  baseUnitId       String?
+  baseUnit         Unit?     @relation("UnitHierarchy", fields: [baseUnitId], references: [id])
+  derivedUnits     Unit[]    @relation("UnitHierarchy")
+  conversionFactor Float     @default(1)
+  precision        Int       @default(2)
+  status           String    @default("active")
+  deletedAt        DateTime?
+
+  createdById String?
+  createdBy   User?   @relation("UnitCreator", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?   @relation("UnitUpdater", fields: [updatedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items Item[]
+
+  @@unique([tenantId, storeId, symbol])
+  @@unique([tenantId, storeId, name])
+}
+
+model Brand {
+  id          String     @id @default(uuid())
+  tenantId    String
+  tenant      Tenant     @relation(fields: [tenantId], references: [id])
+  storeId     String
+  store       Store      @relation(fields: [storeId], references: [id])
+  name        String
+  description String?
+  logo        String?
+  status      String     @default("active")
+  deletedAt   DateTime?
+
+  createdById String?
+  createdBy   User?   @relation("BrandCreator", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?   @relation("BrandUpdater", fields: [updatedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  items     Item[]
+}
+
+
+model Item {
+  id            String    @id @default(uuid())
+  tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id])
+  storeId       String
+  store         Store     @relation(fields: [storeId], references: [id])
+  name          String
+  barcode       String?
+  categoryId    String
+  category      Category  @relation(fields: [categoryId], references: [id])
+  brandId       String?
+  brand         Brand?    @relation(fields: [brandId], references: [id])
+  unitId        String
+  unit          Unit      @relation(fields: [unitId], references: [id])
+  purchasePrice Float
+  salePrice     Float
+  lowStockAlert Int       @default(5)
+  expiryDate    DateTime?
+  status        String    @default("active")
+  deletedAt     DateTime?
+
+  createdById String?
+  createdBy   User?   @relation("ItemCreator", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?   @relation("ItemUpdater", fields: [updatedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactionItems TransactionItem[]
+  storeInventories StoreInventory[]
+  stocks           Stock[]
+  stockMovements   StockMovement[]
+
+  @@unique([tenantId, storeId, barcode])
+}
+
+model Customer {
+  id                 String  @id @default(uuid())
+  tenantId           String
+  tenant             Tenant  @relation(fields: [tenantId], references: [id])
+  storeId            String
+  store              Store   @relation(fields: [storeId], references: [id])
+  name               String
+  email              String?
+  phone              String
+  address            String?
+  companyName        String?
+  taxId              String?
+  customerType       String  @default("RETAIL")
+  creditLimit        Float   @default(0)
+  outstandingBalance Float   @default(0)
+  status             String  @default("ACTIVE")
+
+  createdById String?
+  createdBy   User?     @relation(fields: [createdById], references: [id])
+  deletedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Supplier {
+  id               String  @id @default(uuid())
+  tenantId         String
+  tenant           Tenant  @relation(fields: [tenantId], references: [id])
+  storeId          String
+  store            Store   @relation(fields: [storeId], references: [id])
+  name             String
+  contactPerson    String?
+  email            String?
+  phone            String
+  address          String?
+  companyName      String?
+  taxId            String?
+  paymentTermsDays Int     @default(0)
+  payableBalance   Float   @default(0)
+  status           String  @default("ACTIVE")
+
+  createdById String?
+  createdBy   User?     @relation(fields: [createdById], references: [id])
+  deletedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ExpenseCategory {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  name     String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  expenses Expense[]
+
+  @@unique([tenantId, name])
+}
+
+model Expense {
+  id            String          @id @default(uuid())
+  tenantId      String
+  tenant        Tenant          @relation(fields: [tenantId], references: [id])
+  storeId       String
+  store         Store           @relation(fields: [storeId], references: [id])
+  categoryId    String
+  category      ExpenseCategory @relation(fields: [categoryId], references: [id])
+  amount        Float
+  paymentMethod String          @default("CASH")
+  expenseDate   DateTime        @default(now())
+  description   String?
+  attachmentUrl String?
+
+  createdById String?
+  createdBy   User?     @relation(fields: [createdById], references: [id])
+  deletedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Transaction {
+  id        String  @id @default(uuid())
+  tenantId  String
+  tenant    Tenant  @relation(fields: [tenantId], references: [id])
+  storeId   String
+  store     Store   @relation(fields: [storeId], references: [id])
+  userId    String
+  user      User    @relation(fields: [userId], references: [id])
+  partyType String? // CUSTOMER, SUPPLIER, OTHER
+  partyId   String?
+
+  transactionNumber String @unique
+  type              String // SALE, PURCHASE, PAYMENT_RECEIVED, etc.
+
+  subtotal Float
+  discount Float @default(0)
+  tax      Float @default(0)
+  shipping Float @default(0)
+  total    Float
+
+  paymentMethod   String @default("CASH")
+  paymentDetails  Json? // { cash, card, bankTransfer, credit }
+  balanceTracking Json? // { previousBalance, transactionImpact, currentBalance, ... }
+  creditTerms     Json? // { dueDate, interestRate, lateFee, paidDate, status }
+
+  status    String    @default("COMPLETED")
+  date      DateTime  @default(now())
+  notes     String?
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items          TransactionItem[]
+  stockMovements StockMovement[]
+}
+
+model TransactionItem {
+  id            String      @id @default(uuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  itemId        String?
+  item          Item?       @relation(fields: [itemId], references: [id])
+  itemName      String?
+  quantity      Float
+  price         Float
+  discount      Float       @default(0)
+  total         Float
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CashLedger {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  storeId  String
+  store    Store  @relation(fields: [storeId], references: [id])
+  userId   String
+  user     User   @relation(fields: [userId], references: [id])
+
+  type          String // IN, OUT
+  amount        Float
+  referenceType String // TRANSACTION, EXPENSE, MANUAL, etc.
+  referenceId   String?
+  customerId    String?
+  supplierId    String?
+  description   String?
+  date          DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PartyBalance {
+  id        String @id @default(uuid())
+  tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  storeId   String
+  store     Store  @relation(fields: [storeId], references: [id])
+  partyId   String
+  partyType String // CUSTOMER, SUPPLIER
+
+  currentBalance   Float @default(0)
+  balanceBreakdown Json? // { totalPurchases, totalPayments, etc }
+
+  creditLimit          Float  @default(0)
+  creditUsed           Float  @default(0)
+  creditAvailable      Float  @default(0)
+  paymentTerms         Int    @default(30)
+  defaultPaymentMethod String @default("CASH")
+
+  aging Json? // { current, days30, etc }
+
+  transactionCount    Int       @default(0)
+  lastTransactionDate DateTime?
+  lastPaymentDate     DateTime?
+  deletedAt           DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, storeId, partyId, partyType])
+}
+
+model StoreInventory {
+  id             String @id @default(uuid())
+  tenantId       String
+  tenant         Tenant @relation(fields: [tenantId], references: [id])
+  storeId        String
+  store          Store  @relation(fields: [storeId], references: [id])
+  itemId         String
+  item           Item   @relation(fields: [itemId], references: [id])
+  availableStock Float  @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeId, itemId])
+}
+
+model Stock {
+  id            String    @id @default(uuid())
+  tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id])
+  storeId       String
+  store         Store     @relation(fields: [storeId], references: [id])
+  itemId        String
+  item          Item      @relation(fields: [itemId], references: [id])
+  quantity      Float     @default(0)
+  lastRestocked DateTime?
+  lastSold      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeId, itemId])
+}
+
+model StockMovement {
+  id               String       @id @default(uuid())
+  tenantId         String
+  tenant           Tenant       @relation(fields: [tenantId], references: [id])
+  storeId          String
+  store            Store        @relation(fields: [storeId], references: [id])
+  itemId           String
+  item             Item         @relation(fields: [itemId], references: [id])
+  transactionId    String?
+  transaction      Transaction? @relation(fields: [transactionId], references: [id])
+  type             String // IN, OUT, ADJUSTMENT, RETURN
+  quantity         Float
+  previousQuantity Float
+  newQuantity      Float
+  reason           String?
+  notes            String?
+
+  createdById String?
+  createdBy   User?   @relation(fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Notification {
+  id             String        @id @default(uuid())
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id])
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+  type           String
+  priority       String        @default("medium")
+  title          String
+  message        String
+  data           Json?
+  status         String        @default("unread")
+  channels       Json? // Array of strings
+  sentAt         DateTime?
+  readAt         DateTime?
+  actionUrl      String?
+  actionLabel    String?
+  expiresAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RolePermission {
+  id        String  @id @default(uuid())
+  tenantId  String
+  tenant    Tenant  @relation(fields: [tenantId], references: [id])
+  storeId   String
+  store     Store   @relation(fields: [storeId], references: [id])
+  role      String
+  module    String
+  actions   Json // Array of strings
+  isDefault Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, storeId, role, module])
+}
+
+model PermissionAuditLog {
+  id            String  @id @default(uuid())
+  tenantId      String
+  tenant        Tenant  @relation(fields: [tenantId], references: [id])
+  storeId       String?
+  store         Store?  @relation(fields: [storeId], references: [id])
+  adminId       String
+  admin         User    @relation(fields: [adminId], references: [id])
+  adminEmail    String
+  targetRole    String
+  module        String
+  action        String
+  permission    String?
+  previousState Json? // Array of strings
+  newState      Json? // Array of strings
+  ipAddress     String?
+  userAgent     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

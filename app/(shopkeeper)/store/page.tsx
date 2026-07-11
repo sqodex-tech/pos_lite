@@ -1,0 +1,351 @@
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import {
+    Activity,
+    AlertCircle,
+    ArrowRight,
+    ArrowUpRight,
+    Coins,
+    Clock,
+    CreditCard,
+    Banknote,
+    LayoutDashboard,
+    Package,
+    Plus,
+    Receipt,
+    ShoppingCart,
+    Store,
+    TrendingUp,
+    Users,
+    Zap
+} from 'lucide-react';
+import { motion } from 'framer-motion';
+import toast from 'react-hot-toast';
+import Link from 'next/link';
+import { usePermissions } from '@/hooks/usePermissions';
+import { storesApi } from '@/lib/api/stores';
+import { transactionsApi } from '@/lib/api/transactions';
+import { inventoryApi } from '@/lib/api/inventory';
+import { Button } from '@/components/UI';
+
+export default function TenantDashboard() {
+    const { user } = usePermissions();
+    const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState<any>(null);
+    const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
+    const [lowStockItems, setLowStockItems] = useState<any[]>([]);
+    const [currentStore, setCurrentStore] = useState<any>(null);
+
+    useEffect(() => {
+        fetchDashboardData();
+    }, []);
+
+    const fetchDashboardData = async () => {
+        try {
+            setLoading(true);
+            const storeId = localStorage.getItem('storeId');
+
+            if (!storeId) {
+                toast.error('No store selected. Please select a store first.');
+                return;
+            }
+
+            const [statsRes, transRes, invRes, storeDetails] = await Promise.all([
+                storesApi.getStats(storeId).catch(() => ({
+                    data: {
+                        data: {
+                            todaySales: 0,
+                            todayOrders: 0,
+                            totalItems: 0,
+                            lowStockCount: 0,
+                            activeCustomers: 0
+                        }
+                    }
+                })),
+                transactionsApi.getAll(storeId, { limit: 5 }).catch(() => ({ data: { data: [] } })),
+                inventoryApi.getAll(storeId, { limit: 5, status: 'active' }).catch(() => ({ data: { data: [] } })),
+                storesApi.getById(storeId).catch(() => ({ data: { data: null } }))
+            ]);
+
+            setStats(statsRes.data.data);
+            setRecentTransactions(Array.isArray(transRes.data.data) ? transRes.data.data : []);
+            setLowStockItems(Array.isArray(invRes.data.data) ? invRes.data.data.filter((i: any) => (i.stock || 0) <= (i.lowStockAlert || 5)) : []);
+            setCurrentStore(storeDetails.data.data);
+        } catch (error: any) {
+            console.error('Dashboard load error:', error);
+            toast.error('Failed to load dashboard data');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+                <div className="relative w-16 h-16">
+                    <div className="absolute inset-0 border-4 border-primary/20 rounded-full"></div>
+                    <div className="absolute inset-0 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                </div>
+                <p className="text-slate-500 font-medium animate-pulse">Loading your store snapshot...</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="max-w-7xl mx-auto space-y-10 pb-20">
+            {/* Header / Welcome Section */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div>
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                            <LayoutDashboard className="w-5 h-5 text-primary" />
+                        </div>
+                        <h2 className="text-sm font-black uppercase tracking-widest text-slate-400">Dashboard Overview</h2>
+                    </div>
+                    <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                        Welcome back, <span className="text-primary">{user?.name?.split(' ')[0] || 'Store Admin'}</span>!
+                    </h1>
+                    <p className="text-slate-500 font-medium mt-1">
+                        Here's what's happening at <span className="text-slate-900 dark:text-white font-bold">{currentStore?.name || 'your store'}</span> today.
+                    </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <Link href="/store/pos">
+                        <Button className="rounded-2xl px-8 h-14 bg-primary hover:bg-primary-dark text-white font-black gap-2 shadow-xl shadow-primary/20 hover:shadow-2xl transition-all group">
+                            <Zap className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" />
+                            Open POS
+                        </Button>
+                    </Link>
+                </div>
+            </div>
+
+            {/* Quick Stats Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <DashboardStatCard
+                    title="Gross Sales Today"
+                    value={`Rs ${(stats?.todaySales || 0).toLocaleString()}`}
+                    icon={<Coins className="w-6 h-6" />}
+                    color="emerald"
+                    trend="+12% from yesterday"
+                />
+                <DashboardStatCard
+                    title="Total Orders"
+                    value={(stats?.todayOrders || 0).toString()}
+                    icon={<ShoppingCart className="w-6 h-6" />}
+                    color="blue"
+                    trend="In last 24 hours"
+                />
+                <DashboardStatCard
+                    title="Inventory Status"
+                    value={(stats?.totalItems || 0).toString()}
+                    subtitle={`${stats?.lowStockCount || 0} low stock alerts`}
+                    icon={<Package className="w-6 h-6" />}
+                    color="purple"
+                    alert={stats?.lowStockCount > 0}
+                />
+                <DashboardStatCard
+                    title="Active Customers"
+                    value={(stats?.activeCustomers || 0).toString()}
+                    icon={<Users className="w-6 h-6" />}
+                    color="amber"
+                    trend="Loyalty members"
+                />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Recent Transactions */}
+                <div className="lg:col-span-2 space-y-6">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-xl">
+                                <Receipt className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+                            </div>
+                            <h2 className="text-xl font-black text-slate-900 dark:text-white">Recent Transactions</h2>
+                        </div>
+                        <Link href="/store/transactions" className="text-sm font-bold text-primary hover:underline flex items-center gap-1">
+                            View All <ArrowUpRight className="w-4 h-4" />
+                        </Link>
+                    </div>
+
+                    <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200/60 dark:border-slate-700/60 shadow-xl overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="border-b border-slate-50">
+                                        <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Order ID</th>
+                                        <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Time</th>
+                                        <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Method</th>
+                                        <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {recentTransactions.length > 0 ? recentTransactions.map((tx: any) => (
+                                        <tr key={tx._id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
+                                            <td className="px-6 py-4">
+                                                <p className="text-sm font-bold text-slate-900 dark:text-white">#{tx.transactionNumber?.slice(-6) || 'N/A'}</p>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2 text-slate-500 font-medium text-xs">
+                                                    <Clock className="w-3.5 h-3.5" />
+                                                    {new Date(tx.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400">
+                                                    {tx.paymentMethod}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <p className="text-sm font-black text-slate-900 dark:text-white">Rs {(tx.total || tx.totalAmount || 0).toFixed(2)}</p>
+                                            </td>
+                                        </tr>
+                                    )) : (
+                                        <tr>
+                                            <td colSpan={4} className="px-6 py-12 text-center">
+                                                <div className="flex flex-col items-center">
+                                                    <ShoppingCart className="w-12 h-12 text-slate-200 mb-2" />
+                                                    <p className="text-slate-400 font-medium">No transactions found today</p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Right Sidebar: Quick Actions & Alerts */}
+                <div className="space-y-8">
+                    {/* Quick Actions */}
+                    <div className="space-y-4">
+                        <h2 className="text-lg font-black text-slate-900 dark:text-white px-2">Quick Actions</h2>
+                        <div className="grid grid-cols-1 gap-3">
+                            <QuickActionLink
+                                href="/store/inventory"
+                                icon={<Plus className="w-5 h-5" />}
+                                label="Add New Product"
+                                color="emerald"
+                            />
+                            <QuickActionLink
+                                href="/store/customers"
+                                icon={<Users className="w-5 h-5" />}
+                                label="Register Customer"
+                                color="blue"
+                            />
+                            <QuickActionLink
+                                href="/store/reports"
+                                icon={<TrendingUp className="w-5 h-5" />}
+                                label="View Sales Reports"
+                                color="purple"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Low Stock Alerts */}
+                    {lowStockItems.length > 0 && (
+                        <div className="bg-rose-50 rounded-[2rem] p-6 border border-rose-100 space-y-4">
+                            <div className="flex items-center gap-2 text-rose-600">
+                                <AlertCircle className="w-5 h-5" />
+                                <h2 className="font-black uppercase tracking-widest text-xs">Low Stock Alerts</h2>
+                            </div>
+                            <div className="space-y-3">
+                                {lowStockItems.slice(0, 3).map((item: any) => (
+                                    <div key={item._id} className="flex items-center justify-between gap-3 bg-white/60 dark:bg-slate-900/60 p-3 rounded-xl border border-rose-200/50">
+                                        <div>
+                                            <p className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-[120px]">{item.name}</p>
+                                            <p className="text-[10px] text-rose-500 font-bold uppercase">{item.stock || 0} units left</p>
+                                        </div>
+                                        <Link href={`/store/inventory?search=${item.name}`}>
+                                            <button className="p-2 h-8 w-8 bg-rose-600 text-white rounded-lg flex items-center justify-center hover:bg-rose-700 transition-colors shadow-lg shadow-rose-600/20">
+                                                <Plus className="w-4 h-4" />
+                                            </button>
+                                        </Link>
+                                    </div>
+                                ))}
+                            </div>
+                            <Link href="/store/inventory?filter=low-stock" className="block text-center text-xs font-black text-rose-600 hover:underline uppercase tracking-widest pt-2">
+                                Manage Inventory
+                            </Link>
+                        </div>
+                    )}
+
+                    {/* Store Card */}
+                    <div className="relative bg-gradient-to-br from-primary to-primary-dark dark:from-slate-800 dark:to-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-primary/20 dark:shadow-slate-900/20 overflow-hidden">
+                        <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 dark:bg-slate-900/5 rounded-full blur-3xl"></div>
+                        <div className="relative z-10">
+                            <div className="w-12 h-12 bg-white/10 dark:bg-slate-900/10 rounded-2xl flex items-center justify-center mb-4">
+                                <Store className="w-6 h-6 text-primary" />
+                            </div>
+                            <h3 className="text-xl font-black mb-1">{currentStore?.name || 'My Store'}</h3>
+                            <p className="text-slate-400 text-sm font-medium mb-6">Store ID: #{currentStore?._id?.slice(-8).toUpperCase() || 'N/A'}</p>
+
+                            <Link href="/store/settings">
+                                <button className="w-full py-3 bg-white/10 dark:bg-slate-900/10 hover:bg-white/20 dark:hover:bg-slate-900/20 border border-white/10 rounded-xl text-xs font-black uppercase tracking-widest transition-all">
+                                    Store Settings
+                                </button>
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function DashboardStatCard({ title, value, subtitle, icon, color, trend, alert }: any) {
+    const colorVariants: any = {
+        emerald: "bg-emerald-500 shadow-emerald-500/20",
+        blue: "bg-blue-500 shadow-blue-500/20",
+        purple: "bg-purple-500 shadow-purple-500/20",
+        amber: "bg-amber-500 shadow-amber-500/20",
+        rose: "bg-rose-500 shadow-rose-500/20"
+    };
+
+    return (
+        <motion.div
+            whileHover={{ y: -5 }}
+            className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-7 border border-slate-200/60 dark:border-slate-700/60 shadow-xl relative overflow-hidden group"
+        >
+            <div className={`w-14 h-14 ${colorVariants[color]} rounded-2xl flex items-center justify-center text-white mb-6 shadow-xl transition-transform group-hover:scale-110 duration-500`}>
+                {icon}
+            </div>
+
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">{title}</p>
+            <div className="flex items-baseline gap-2">
+                <h3 className="text-3xl font-black text-slate-900 dark:text-white">{value}</h3>
+                {alert && <div className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></div>}
+            </div>
+
+            {(trend || subtitle) && (
+                <p className={`mt-3 text-xs font-bold ${alert ? 'text-rose-500' : 'text-slate-500'}`}>
+                    {trend || subtitle}
+                </p>
+            )}
+        </motion.div>
+    );
+}
+
+function QuickActionLink({ href, icon, label, color }: any) {
+    const colorClasses: any = {
+        emerald: "text-emerald-600 hover:bg-emerald-50",
+        blue: "text-blue-600 hover:bg-blue-50",
+        purple: "text-purple-600 hover:bg-purple-50"
+    };
+
+    return (
+        <Link href={href}>
+            <div className={`flex items-center justify-between p-4 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl transition-all cursor-pointer group shadow-sm hover:shadow-md ${colorClasses[color]}`}>
+                <div className="flex items-center gap-3">
+                    <div className="transition-transform group-hover:scale-110">
+                        {icon}
+                    </div>
+                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{label}</span>
+                </div>
+                <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" />
+            </div>
+        </Link>
+    );
+}

@@ -1,0 +1,454 @@
+openapi: 3.0.0
+info:
+  title: SumboxPro API
+  description: |
+    Production-grade multi-tenant Retail & POS API.
+    All responses follow the pattern:
+    ```json
+    {
+      "data": ...,
+      "meta": { "total": 0, "page": 1, "totalPages": 0, "hasMore": false },
+      "error": null
+    }
+    ```
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:5000/api/v1
+    description: Local development server
+
+security:
+  - bearerAuth: []
+
+paths:
+  # --- AUTH ---
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register new tenant/user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password, tenantName]
+              properties:
+                name: { type: string }
+                email: { type: string }
+                password: { type: string }
+                tenantName: { type: string }
+      responses:
+        '201':
+          description: Created
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+      responses:
+        '200':
+          description: Success
+
+  # --- STORES ---
+  /stores:
+    get:
+      tags: [Stores]
+      summary: List stores
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20, maximum: 100 }
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponse' }
+    post:
+      tags: [Stores]
+      summary: Create store
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Store' }
+      responses:
+        '201':
+          description: Created
+
+  /stores/{id}:
+    get:
+      tags: [Stores]
+      summary: Get store by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Success
+    patch:
+      tags: [Stores]
+      summary: Update store
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StoreUpdate' }
+      responses:
+        '200':
+          description: Updated
+    delete:
+      tags: [Stores]
+      summary: Soft delete store
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Deleted
+
+  # --- INVENTORY ---
+  /inventory:
+    get:
+      tags: [Inventory]
+      summary: List items
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20, maximum: 100 }
+        - in: query
+          name: search
+          schema: { type: string }
+      responses:
+        '200':
+          description: Success
+    post:
+      tags: [Inventory]
+      summary: Create item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Item' }
+      responses:
+        '201':
+          description: Created
+
+  /inventory/{id}:
+    get:
+      tags: [Inventory]
+      summary: Get item by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Success
+    patch:
+      tags: [Inventory]
+      summary: Update item
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ItemUpdate' }
+      responses:
+        '200':
+          description: Updated
+    delete:
+      tags: [Inventory]
+      summary: Soft delete item
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Deleted
+
+  /inventory/stock/{storeId}:
+    get:
+      tags: [Inventory]
+      summary: Get stock for a specific store
+      parameters:
+        - in: path
+          name: storeId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Success
+
+  # --- TRANSACTIONS ---
+  /transactions:
+    get:
+      tags: [Transactions]
+      summary: List all transactions
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: Success
+    post:
+      tags: [Transactions]
+      summary: Create transaction (Sale/Purchase)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Transaction' }
+      responses:
+        '201':
+          description: Success
+
+  /transactions/store/{storeId}:
+    get:
+      tags: [Transactions]
+      summary: List transactions for a specific store
+      parameters:
+        - in: path
+          name: storeId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Success
+
+  /transactions/{id}:
+    get:
+      tags: [Transactions]
+      summary: Get transaction by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Success
+    delete:
+      tags: [Transactions]
+      summary: Cancel/Soft delete transaction
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Success
+
+  # --- EXPENSES ---
+  /expenses:
+    get:
+      tags: [Expenses]
+      summary: List expenses
+      parameters:
+        - in: query
+          name: storeId
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+      responses:
+        '200':
+          description: Success
+    post:
+      tags: [Expenses]
+      summary: Record expense
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Expense' }
+      responses:
+        '201':
+          description: Success
+
+  /expenses/{id}:
+    get:
+      tags: [Expenses]
+      summary: Get expense by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Success
+    delete:
+      tags: [Expenses]
+      summary: Soft delete expense
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Success
+
+  # --- REPORTS ---
+  /reports/profit-loss:
+    get:
+      tags: [Reports]
+      summary: Get Profit & Loss report
+      parameters:
+        - in: query
+          name: storeId
+          schema: { type: string }
+        - in: query
+          name: startDate
+          schema: { type: string, format: date }
+        - in: query
+          name: endDate
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Success
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ApiResponse:
+      type: object
+      properties:
+        data: { type: object, nullable: true }
+        meta: { $ref: '#/components/schemas/Meta' }
+        error: { $ref: '#/components/schemas/Error' }
+
+    Meta:
+      type: object
+      nullable: true
+      properties:
+        total: { type: integer }
+        page: { type: integer }
+        totalPages: { type: integer }
+        hasMore: { type: boolean }
+
+    Error:
+      type: object
+      nullable: true
+      properties:
+        message: { type: string }
+        code: { type: integer }
+        requestId: { type: string }
+        errors: 
+          type: array
+          items:
+            type: object
+            properties:
+              path: { type: string }
+              message: { type: string }
+
+    Store:
+      type: object
+      required: [name, code]
+      properties:
+        name: { type: string }
+        code: { type: string }
+        address: { type: string }
+        phone: { type: string }
+
+    StoreUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        code: { type: string }
+        address: { type: string }
+        phone: { type: string }
+        status: { type: string, enum: [active, inactive] }
+
+    Item:
+      type: object
+      required: [name, categoryId, unitId, purchasePrice, salePrice]
+      properties:
+        name: { type: string }
+        barcode: { type: string }
+        categoryId: { type: string }
+        unitId: { type: string }
+        purchasePrice: { type: number }
+        salePrice: { type: number }
+        lowStockAlert: { type: number, default: 5 }
+
+    ItemUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        barcode: { type: string }
+        purchasePrice: { type: number }
+        salePrice: { type: number }
+        status: { type: string, enum: [active, inactive] }
+
+    Transaction:
+      type: object
+      required: [storeId, type, items, total, paymentMethod]
+      properties:
+        storeId: { type: string }
+        type: { type: string, enum: [SALE, PURCHASE, RETURN] }
+        items:
+          type: array
+          items:
+            type: object
+            required: [itemId, quantity, priceAtTime]
+            properties:
+              itemId: { type: string }
+              quantity: { type: number }
+              priceAtTime: { type: number }
+        total: { type: number }
+        paymentMethod: { type: string, enum: [CASH, CARD, BANK, CREDIT] }
+
+    Expense:
+      type: object
+      required: [storeId, categoryId, amount, paymentMethod]
+      properties:
+        storeId: { type: string }
+        categoryId: { type: string }
+        amount: { type: number }
+        paymentMethod: { type: string, enum: [CASH, BANK, CARD] }
+        description: { type: string }
