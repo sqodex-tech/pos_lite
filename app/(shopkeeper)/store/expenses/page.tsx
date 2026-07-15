@@ -11,12 +11,12 @@ import { usePermissions, PERMISSIONS } from '@/hooks/usePermissions';
 export default function ExpensesPage() {
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [loading, setLoading] = useState(true);
+    const [initialLoad, setInitialLoad] = useState(true);
     const [showModal, setShowModal] = useState(false);
-    const [stats, setStats] = useState({
-        total: 0,
-        thisMonth: 0,
-        categories: 0
-    });
+    const [dateFilter, setDateFilter] = useState('all');
+    const [customStart, setCustomStart] = useState('');
+    const [customEnd, setCustomEnd] = useState('');
+
     const { hasPermission, loading: permissionsLoading } = usePermissions();
 
     useEffect(() => {
@@ -29,15 +29,6 @@ export default function ExpensesPage() {
             const response = await expensesApi.getAll(storeId);
             const expenseData = Array.isArray(response.data.data) ? response.data.data : [];
             setExpenses(expenseData);
-
-            // Calculate stats
-            const total = expenseData.reduce((sum: number, exp: Expense) => sum + exp.amount, 0);
-            const thisMonth = expenseData
-                .filter((exp: Expense) => new Date(exp.date).getMonth() === new Date().getMonth())
-                .reduce((sum: number, exp: Expense) => sum + exp.amount, 0);
-            const categories = new Set(expenseData.map((exp: Expense) => exp.category)).size;
-
-            setStats({ total, thisMonth, categories });
         } catch (error: any) {
             console.error('Fetch expenses error:', error);
 
@@ -50,9 +41,9 @@ export default function ExpensesPage() {
             }
 
             setExpenses([]);
-            setStats({ total: 0, thisMonth: 0, categories: 0 });
         } finally {
             setLoading(false);
+            setInitialLoad(false);
         }
     };
 
@@ -67,7 +58,47 @@ export default function ExpensesPage() {
         }
     };
 
-    if (loading || permissionsLoading) {
+    const filteredExpenses = expenses.filter(exp => {
+        let matchesDate = true;
+        if (dateFilter !== 'all' && exp.date) {
+            const expDate = new Date(exp.date);
+            let start = new Date();
+            let end = new Date();
+            start.setHours(0, 0, 0, 0);
+
+            if (dateFilter === 'today') {
+                // start is already today at 00:00
+            } else if (dateFilter === '15_days') {
+                start.setDate(start.getDate() - 15);
+            } else if (dateFilter === '1_month') {
+                start.setMonth(start.getMonth() - 1);
+            } else if (dateFilter === '3_months') {
+                start.setMonth(start.getMonth() - 3);
+            } else if (dateFilter === 'custom') {
+                if (customStart && customEnd) {
+                    start = new Date(customStart);
+                    end = new Date(customEnd);
+                    end.setHours(23, 59, 59, 999);
+                } else {
+                    matchesDate = true;
+                }
+            }
+            if (dateFilter !== 'custom' || (customStart && customEnd)) {
+                matchesDate = expDate >= start && expDate <= end;
+            }
+        }
+        return matchesDate;
+    });
+
+    const stats = {
+        total: filteredExpenses.reduce((sum: number, exp: Expense) => sum + exp.amount, 0),
+        thisMonth: filteredExpenses
+            .filter((exp: Expense) => new Date(exp.date).getMonth() === new Date().getMonth())
+            .reduce((sum: number, exp: Expense) => sum + exp.amount, 0),
+        categories: new Set(filteredExpenses.map((exp: Expense) => exp.category)).size
+    };
+
+    if (initialLoad || permissionsLoading) {
         return (
             <div className="flex items-center justify-center h-96">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -82,8 +113,8 @@ export default function ExpensesPage() {
     const canManage = hasPermission(PERMISSIONS.CREATE_EXPENSE);
 
     return (
-        <div className="max-w-7xl mx-auto space-y-8">
-            <div className="flex items-center justify-between">
+        <div className={`max-w-7xl mx-auto space-y-8 transition-opacity duration-200 ${loading ? 'opacity-50 pointer-events-none animate-pulse' : 'opacity-100'}`}>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Store Expenses</h1>
                     <p className="text-slate-500 mt-1">Track and manage store expenses</p>
@@ -93,6 +124,39 @@ export default function ExpensesPage() {
                         <Plus className="w-5 h-5" />
                         Add Expense
                     </Button>
+                )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4">
+                <select
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value)}
+                    className="px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer shrink-0"
+                >
+                    <option value="all">All Time</option>
+                    <option value="today">Today</option>
+                    <option value="15_days">15 Days</option>
+                    <option value="1_month">1 Month</option>
+                    <option value="3_months">3 Months</option>
+                    <option value="custom">Custom Dates</option>
+                </select>
+                
+                {dateFilter === 'custom' && (
+                    <div className="flex items-center gap-2 shrink-0">
+                        <input 
+                            type="date" 
+                            value={customStart} 
+                            onChange={(e) => setCustomStart(e.target.value)}
+                            className="px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-primary/20"
+                        />
+                        <span className="text-slate-400 font-bold">to</span>
+                        <input 
+                            type="date" 
+                            value={customEnd} 
+                            onChange={(e) => setCustomEnd(e.target.value)}
+                            className="px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-primary/20"
+                        />
+                    </div>
                 )}
             </div>
 
@@ -132,7 +196,7 @@ export default function ExpensesPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        {expenses.map((expense) => (
+                        {filteredExpenses.map((expense) => (
                             <tr key={expense._id} className="border-b border-slate-50 hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
                                 <td className="py-4 px-4 font-medium text-slate-800 dark:text-slate-200">{expense.description}</td>
                                 <td className="py-4 px-4">
@@ -153,10 +217,11 @@ export default function ExpensesPage() {
                         ))}
                     </tbody>
                 </table>
-                {expenses.length === 0 && (
-                    <div className="text-center py-12">
-                        <Wallet className="w-16 h-16 text-slate-200 mx-auto mb-4" />
-                        <p className="text-slate-400 font-medium">No expenses recorded yet</p>
+                {filteredExpenses.length === 0 && (
+                    <div className="p-8 text-center">
+                        <Wallet className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                        <h3 className="text-lg font-medium text-slate-900 dark:text-white">No expenses found</h3>
+                        <p className="text-slate-500 mt-1">Try adjusting your date filter or add a new expense.</p>
                     </div>
                 )}
             </div>
@@ -178,6 +243,7 @@ function ExpenseModal({ onClose, onSuccess }: any) {
         category: '',
         date: new Date().toISOString().split('T')[0],
     });
+    const [customCategory, setCustomCategory] = useState('');
     const [loading, setLoading] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -185,8 +251,10 @@ function ExpenseModal({ onClose, onSuccess }: any) {
         setLoading(true);
         try {
             const storeId = localStorage.getItem('storeId') || 'default-store-id';
+            const finalCategory = formData.category === 'Other' ? customCategory : formData.category;
             await expensesApi.create(storeId, {
                 ...formData,
+                category: finalCategory,
                 amount: parseFloat(formData.amount)
             });
             toast.success('Expense added successfully');
@@ -251,9 +319,22 @@ function ExpenseModal({ onClose, onSuccess }: any) {
                             <option value="Supplies">Supplies</option>
                             <option value="Marketing">Marketing</option>
                             <option value="Maintenance">Maintenance</option>
+                            <option value="Personal">Personal</option>
+                            <option value="Profit Out">Profit Out</option>
                             <option value="Other">Other</option>
                         </select>
                     </div>
+                    {formData.category === 'Other' && (
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Custom Category</label>
+                            <Input
+                                value={customCategory}
+                                onChange={(e) => setCustomCategory(e.target.value)}
+                                placeholder="Enter custom category"
+                                required
+                            />
+                        </div>
+                    )}
                     <div className="flex gap-4 pt-4">
                         <Button type="button" onClick={onClose} className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200">
                             Cancel

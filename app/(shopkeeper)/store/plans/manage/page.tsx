@@ -82,7 +82,7 @@ export default function ManagePlansPage() {
                             key={plan._id}
                             plan={plan}
                             onEdit={() => { setSelectedPlan(plan); setShowModal(true); }}
-                            onDelete={() => handleDelete(plan._id)}
+                            onDelete={() => handleDelete(plan._id || plan.id || '')}
                         />
                     ))}
                 </AnimatePresence>
@@ -196,7 +196,7 @@ function PlanModal({ plan, onClose, onSuccess }: {
             };
 
             if (plan) {
-                await plansApi.update(plan._id, data);
+                await plansApi.update(plan._id || plan.id || '', data);
                 toast.success('Plan updated successfully');
             } else {
                 await plansApi.create(data);

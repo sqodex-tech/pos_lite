@@ -117,7 +117,23 @@ class ReportService {
         };
 
         const salesCount = salesData._count.id || 0;
-        const grossProfit = totals.sales - totals.purchases;
+
+        // Calculate COGS (Cost of Goods Sold) based on sold items
+        const soldItems = await prisma.transactionItem.findMany({
+            where: {
+                transaction: { ...match, type: 'SALE', date: dateMatch }
+            },
+            include: { item: { select: { purchasePrice: true } } }
+        });
+
+        let cogs = 0;
+        soldItems.forEach(ti => {
+            if (ti.item && ti.item.purchasePrice) {
+                cogs += ti.quantity * ti.item.purchasePrice;
+            }
+        });
+
+        const grossProfit = totals.sales - cogs;
         const netProfit = grossProfit - totals.expenses;
         const profitMargin = totals.sales > 0 ? ((netProfit / totals.sales) * 100).toFixed(2) : 0;
 

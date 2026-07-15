@@ -313,6 +313,8 @@ model Item {
   stockMovements   StockMovement[]
 
   @@unique([tenantId, storeId, barcode])
+  @@index([tenantId, storeId, status])
+  @@index([tenantId, storeId, deletedAt])
 }
 
 model Customer {
@@ -338,6 +340,9 @@ model Customer {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId, storeId, status])
+  @@index([tenantId, storeId, deletedAt])
 }
 
 model Supplier {
@@ -363,6 +368,9 @@ model Supplier {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId, storeId, status])
+  @@index([tenantId, storeId, deletedAt])
 }
 
 model ExpenseCategory {
@@ -399,6 +407,9 @@ model Expense {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId, storeId, expenseDate])
+  @@index([tenantId, storeId, deletedAt])
 }
 
 model Transaction {
@@ -436,6 +447,10 @@ model Transaction {
 
   items          TransactionItem[]
   stockMovements StockMovement[]
+
+  @@index([tenantId, storeId, date])
+  @@index([tenantId, storeId, status])
+  @@index([tenantId, storeId, type])
 }
 
 model TransactionItem {
@@ -531,7 +546,7 @@ model Stock {
   store         Store     @relation(fields: [storeId], references: [id])
   itemId        String
   item          Item      @relation(fields: [itemId], references: [id])
-  quantity      Float     @default(0)
+  quantity      Float    @default(0)
   lastRestocked DateTime?
   lastSold      DateTime?
 
@@ -539,6 +554,7 @@ model Stock {
   updatedAt DateTime @updatedAt
 
   @@unique([storeId, itemId])
+  @@index([tenantId, storeId])
 }
 
 model StockMovement {

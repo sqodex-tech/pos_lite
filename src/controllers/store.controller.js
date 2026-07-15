@@ -140,6 +140,52 @@ const getStoreStats = async (req, res, next) => {
             }
         });
 
+        const { startDate, endDate } = req.query;
+        let startOfDay = new Date();
+        let endOfDay = new Date();
+        
+        if (startDate && endDate) {
+            startOfDay = new Date(startDate);
+            endOfDay = new Date(endDate);
+        } else {
+            startOfDay.setHours(0, 0, 0, 0);
+            endOfDay.setHours(23, 59, 59, 999);
+        }
+
+        // Sales & Orders Today / Range
+        const rangeTransactions = await prisma.transaction.findMany({
+            where: {
+                storeId: store.id,
+                tenantId: store.tenantId,
+                date: { gte: startOfDay, lte: endOfDay },
+                deletedAt: null
+            }
+        });
+        const todaySales = rangeTransactions.filter(tx => tx.type === 'SALE').reduce((acc, tx) => acc + Number(tx.total || 0), 0);
+        const todayPurchases = rangeTransactions.filter(tx => tx.type === 'PURCHASE').reduce((acc, tx) => acc + Number(tx.total || 0), 0);
+        const todayOrders = rangeTransactions.filter(tx => tx.type === 'SALE').length;
+        const purchaseOrders = rangeTransactions.filter(tx => tx.type === 'PURCHASE').length;
+
+        // Inventory Stats
+        const inventoryItems = await prisma.item.findMany({
+            where: {
+                storeId: store.id,
+                tenantId: store.tenantId,
+                status: 'active',
+                deletedAt: null
+            }
+        });
+        const totalItems = inventoryItems.length;
+        const lowStockCount = inventoryItems.filter(i => (i.stock || 0) <= (i.lowStockAlert || 5)).length;
+
+        // Customers Count
+        const activeCustomers = await prisma.customer.count({
+            where: {
+                tenantId: store.tenantId,
+                deletedAt: null
+            }
+        });
+
         const stats = {
             store: {
                 id: store.id,
@@ -155,7 +201,14 @@ const getStoreStats = async (req, res, next) => {
                     acc[item.role] = item._count._all;
                     return acc;
                 }, {})
-            }
+            },
+            todaySales,
+            todayPurchases,
+            todayOrders,
+            purchaseOrders,
+            totalItems,
+            lowStockCount,
+            activeCustomers
         };
 
         return res.status(200).json(

@@ -242,6 +242,65 @@ const transferStock = async (req, res, next) => {
     }
 };
 
+const getInventoryStats = async (req, res, next) => {
+    try {
+        const storeId = req.query.storeId || req.headers['x-store-id'];
+        const prisma = require('../config/prisma');
+
+        const tenantId = req.tenantId;
+        const now = new Date();
+
+        let stats = { total: 0, expired: 0, lowStock: 0, totalValue: 0 };
+
+        if (storeId && storeId !== 'all') {
+            const rawResult = await prisma.$queryRaw`
+                SELECT 
+                    COUNT(DISTINCT i.id) as total,
+                    SUM(CASE WHEN i.expiryDate < ${now} THEN 1 ELSE 0 END) as expired,
+                    SUM(CASE WHEN IFNULL(s.quantity, 0) <= i.lowStockAlert THEN 1 ELSE 0 END) as lowStock,
+                    SUM(IFNULL(s.quantity, 0) * i.purchasePrice) as totalValue
+                FROM Item i
+                LEFT JOIN Stock s ON i.id = s.itemId AND s.storeId = ${storeId}
+                WHERE i.tenantId = ${tenantId} AND i.storeId = ${storeId} AND i.deletedAt IS NULL
+            `;
+            if (rawResult && rawResult[0]) {
+                stats = {
+                    total: Number(rawResult[0].total) || 0,
+                    expired: Number(rawResult[0].expired) || 0,
+                    lowStock: Number(rawResult[0].lowStock) || 0,
+                    totalValue: Number(rawResult[0].totalValue) || 0,
+                };
+            }
+        } else {
+            const rawResult = await prisma.$queryRaw`
+                SELECT 
+                    COUNT(DISTINCT i.id) as total,
+                    SUM(CASE WHEN i.expiryDate < ${now} THEN 1 ELSE 0 END) as expired,
+                    SUM(CASE WHEN 
+                        (SELECT IFNULL(SUM(s.quantity), 0) FROM Stock s WHERE s.itemId = i.id) <= i.lowStockAlert 
+                        THEN 1 ELSE 0 END) as lowStock,
+                    SUM(
+                        (SELECT IFNULL(SUM(s.quantity), 0) FROM Stock s WHERE s.itemId = i.id) * i.purchasePrice
+                    ) as totalValue
+                FROM Item i
+                WHERE i.tenantId = ${tenantId} AND i.deletedAt IS NULL
+            `;
+            if (rawResult && rawResult[0]) {
+                stats = {
+                    total: Number(rawResult[0].total) || 0,
+                    expired: Number(rawResult[0].expired) || 0,
+                    lowStock: Number(rawResult[0].lowStock) || 0,
+                    totalValue: Number(rawResult[0].totalValue) || 0,
+                };
+            }
+        }
+
+        return res.status(200).json(new ApiResponse(200, stats, 'Inventory stats fetched successfully'));
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     createItem,
     getItems,
@@ -251,5 +310,6 @@ module.exports = {
     getStoreStock,
     getStockMovements,
     adjustStock,
-    transferStock
+    transferStock,
+    getInventoryStats
 };

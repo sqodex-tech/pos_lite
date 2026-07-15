@@ -32,14 +32,21 @@ import { Button } from '@/components/UI';
 export default function TenantDashboard() {
     const { user } = usePermissions();
     const [loading, setLoading] = useState(true);
+    const [initialLoad, setInitialLoad] = useState(true);
     const [stats, setStats] = useState<any>(null);
     const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
     const [lowStockItems, setLowStockItems] = useState<any[]>([]);
     const [currentStore, setCurrentStore] = useState<any>(null);
 
+    const [dateFilter, setDateFilter] = useState('today');
+    const [customStart, setCustomStart] = useState('');
+    const [customEnd, setCustomEnd] = useState('');
+
     useEffect(() => {
-        fetchDashboardData();
-    }, []);
+        if (dateFilter !== 'custom') {
+            fetchDashboardData();
+        }
+    }, [dateFilter]);
 
     const fetchDashboardData = async () => {
         try {
@@ -51,19 +58,51 @@ export default function TenantDashboard() {
                 return;
             }
 
+            let start = new Date();
+            let end = new Date();
+
+            if (dateFilter === 'today') {
+                start.setHours(0, 0, 0, 0);
+            } else if (dateFilter === '7_days') {
+                start.setDate(start.getDate() - 7);
+                start.setHours(0, 0, 0, 0);
+            } else if (dateFilter === '15_days') {
+                start.setDate(start.getDate() - 15);
+                start.setHours(0, 0, 0, 0);
+            } else if (dateFilter === '1_month') {
+                start.setMonth(start.getMonth() - 1);
+            } else if (dateFilter === '3_months') {
+                start.setMonth(start.getMonth() - 3);
+            } else if (dateFilter === 'custom') {
+                if (customStart && customEnd) {
+                    start = new Date(customStart);
+                    end = new Date(customEnd);
+                    end.setHours(23, 59, 59, 999);
+                } else {
+                    start.setHours(0, 0, 0, 0); // fallback
+                }
+            } else {
+                start.setHours(0, 0, 0, 0);
+            }
+
             const [statsRes, transRes, invRes, storeDetails] = await Promise.all([
-                storesApi.getStats(storeId).catch(() => ({
+                storesApi.getStats(storeId, {
+                    startDate: start.toISOString(),
+                    endDate: end.toISOString()
+                }).catch(() => ({
                     data: {
                         data: {
                             todaySales: 0,
+                            todayPurchases: 0,
                             todayOrders: 0,
+                            purchaseOrders: 0,
                             totalItems: 0,
                             lowStockCount: 0,
                             activeCustomers: 0
                         }
                     }
                 })),
-                transactionsApi.getAll(storeId, { limit: 5 }).catch(() => ({ data: { data: [] } })),
+                transactionsApi.getAll(storeId, { limit: 5, startDate: start.toISOString(), endDate: end.toISOString() }).catch(() => ({ data: { data: [] } })),
                 inventoryApi.getAll(storeId, { limit: 5, status: 'active' }).catch(() => ({ data: { data: [] } })),
                 storesApi.getById(storeId).catch(() => ({ data: { data: null } }))
             ]);
@@ -77,10 +116,11 @@ export default function TenantDashboard() {
             toast.error('Failed to load dashboard data');
         } finally {
             setLoading(false);
+            setInitialLoad(false);
         }
     };
 
-    if (loading) {
+    if (initialLoad) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
                 <div className="relative w-16 h-16">
@@ -111,7 +151,41 @@ export default function TenantDashboard() {
                     </p>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <select
+                            value={dateFilter}
+                            onChange={(e) => setDateFilter(e.target.value)}
+                            className="px-3 py-1.5 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-lg outline-none bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 shadow-sm"
+                        >
+                            <option value="today">Today</option>
+                            <option value="7_days">7 Days</option>
+                            <option value="15_days">15 Days</option>
+                            <option value="1_month">1 Month</option>
+                            <option value="3_months">3 Months</option>
+                            <option value="custom">Custom Dates</option>
+                        </select>
+                        
+                        {dateFilter === 'custom' && (
+                            <div className="flex items-center gap-2">
+                                <input 
+                                    type="date" 
+                                    value={customStart} 
+                                    onChange={(e) => setCustomStart(e.target.value)}
+                                    className="px-3 py-1.5 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-lg outline-none bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 shadow-sm"
+                                />
+                                <span className="text-slate-400 text-xs font-bold">to</span>
+                                <input 
+                                    type="date" 
+                                    value={customEnd} 
+                                    onChange={(e) => setCustomEnd(e.target.value)}
+                                    className="px-3 py-1.5 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-lg outline-none bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 shadow-sm"
+                                />
+                                <Button size="sm" className="py-1.5 px-3 text-xs" onClick={fetchDashboardData}>Apply</Button>
+                            </div>
+                        )}
+                    </div>
+                    
                     <Link href="/store/pos">
                         <Button className="rounded-2xl px-8 h-14 bg-primary hover:bg-primary-dark text-white font-black gap-2 shadow-xl shadow-primary/20 hover:shadow-2xl transition-all group">
                             <Zap className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" />
@@ -124,18 +198,20 @@ export default function TenantDashboard() {
             {/* Quick Stats Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 <DashboardStatCard
-                    title="Gross Sales Today"
+                    title="Gross Sales"
                     value={`Rs ${(stats?.todaySales || 0).toLocaleString()}`}
                     icon={<Coins className="w-6 h-6" />}
                     color="emerald"
-                    trend="+12% from yesterday"
+                    trend={dateFilter === 'today' ? `${stats?.todayOrders || 0} orders today` : `${stats?.todayOrders || 0} orders in range`}
+                    loading={loading}
                 />
                 <DashboardStatCard
-                    title="Total Orders"
-                    value={(stats?.todayOrders || 0).toString()}
-                    icon={<ShoppingCart className="w-6 h-6" />}
-                    color="blue"
-                    trend="In last 24 hours"
+                    title="Gross Purchases"
+                    value={`Rs ${(stats?.todayPurchases || 0).toLocaleString()}`}
+                    icon={<Receipt className="w-6 h-6" />}
+                    color="rose"
+                    trend={dateFilter === 'today' ? `${stats?.purchaseOrders || 0} purchases today` : `${stats?.purchaseOrders || 0} purchases in range`}
+                    loading={loading}
                 />
                 <DashboardStatCard
                     title="Inventory Status"
@@ -144,6 +220,7 @@ export default function TenantDashboard() {
                     icon={<Package className="w-6 h-6" />}
                     color="purple"
                     alert={stats?.lowStockCount > 0}
+                    loading={loading}
                 />
                 <DashboardStatCard
                     title="Active Customers"
@@ -151,6 +228,7 @@ export default function TenantDashboard() {
                     icon={<Users className="w-6 h-6" />}
                     color="amber"
                     trend="Loyalty members"
+                    loading={loading}
                 />
             </div>
 
@@ -181,8 +259,8 @@ export default function TenantDashboard() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
-                                    {recentTransactions.length > 0 ? recentTransactions.map((tx: any) => (
-                                        <tr key={tx._id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
+                                    {recentTransactions.length > 0 ? recentTransactions.map((tx: any, index: number) => (
+                                        <tr key={tx._id || tx.id || index} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
                                             <td className="px-6 py-4">
                                                 <p className="text-sm font-bold text-slate-900 dark:text-white">#{tx.transactionNumber?.slice(-6) || 'N/A'}</p>
                                             </td>
@@ -252,8 +330,8 @@ export default function TenantDashboard() {
                                 <h2 className="font-black uppercase tracking-widest text-xs">Low Stock Alerts</h2>
                             </div>
                             <div className="space-y-3">
-                                {lowStockItems.slice(0, 3).map((item: any) => (
-                                    <div key={item._id} className="flex items-center justify-between gap-3 bg-white/60 dark:bg-slate-900/60 p-3 rounded-xl border border-rose-200/50">
+                                {lowStockItems.slice(0, 3).map((item: any, index: number) => (
+                                    <div key={item._id || item.id || index} className="flex items-center justify-between gap-3 bg-white/60 dark:bg-slate-900/60 p-3 rounded-xl border border-rose-200/50">
                                         <div>
                                             <p className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-[120px]">{item.name}</p>
                                             <p className="text-[10px] text-rose-500 font-bold uppercase">{item.stock || 0} units left</p>
@@ -295,7 +373,7 @@ export default function TenantDashboard() {
     );
 }
 
-function DashboardStatCard({ title, value, subtitle, icon, color, trend, alert }: any) {
+function DashboardStatCard({ title, value, subtitle, icon, color, trend, alert, loading }: any) {
     const colorVariants: any = {
         emerald: "bg-emerald-500 shadow-emerald-500/20",
         blue: "bg-blue-500 shadow-blue-500/20",
@@ -315,7 +393,9 @@ function DashboardStatCard({ title, value, subtitle, icon, color, trend, alert }
 
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">{title}</p>
             <div className="flex items-baseline gap-2">
-                <h3 className="text-3xl font-black text-slate-900 dark:text-white">{value}</h3>
+                <h3 className="text-3xl font-black text-slate-900 dark:text-white">
+                    {loading ? <span className="inline-block w-24 h-8 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></span> : value}
+                </h3>
                 {alert && <div className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></div>}
             </div>
 

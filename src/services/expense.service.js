@@ -5,10 +5,28 @@ const ApiError = require('../utils/ApiError');
 class ExpenseService {
     async createExpense(expenseData, tenantId, userId) {
         return await prisma.$transaction(async (tx) => {
+            let categoryId = expenseData.categoryId;
+            if (expenseData.category) {
+                let categoryObj = await tx.expenseCategory.findFirst({
+                    where: { tenantId, name: expenseData.category }
+                });
+                if (!categoryObj) {
+                    categoryObj = await tx.expenseCategory.create({
+                        data: { tenantId, name: expenseData.category }
+                    });
+                }
+                categoryId = categoryObj.id;
+            }
+
+            const { category, date, ...restData } = expenseData;
+
             const expense = await expenseRepository.create({
-                ...expenseData,
+                ...restData,
+                categoryId: categoryId,
+                expenseDate: date ? new Date(date) : new Date(),
+                paymentMethod: expenseData.paymentMethod || 'CASH',
                 tenantId,
-                createdBy: userId
+                createdById: userId
             }, tx);
 
             if (expense.paymentMethod === 'CASH') {

@@ -44,4 +44,7 @@ export const inventoryApi = {
 
     transferStock: (data: { fromStoreId: string; toStoreId: string; itemId: string; quantity: number; notes?: string }) =>
         api.post(`/inventory/stock/transfer`, data),
+
+    getStats: (storeId: string) =>
+        api.get(`/inventory/stats`, { params: { storeId } }),
 };

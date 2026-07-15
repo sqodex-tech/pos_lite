@@ -1,5 +1,6 @@
 const prisma = require('../config/prisma');
 const customerRepository = require('../repositories/customer.repository');
+const transactionService = require('./transaction.service');
 const ApiError = require('../utils/ApiError');
 
 class CustomerService {
@@ -40,6 +41,21 @@ class CustomerService {
             // Paying reduces what they owe us
             await customerRepository.updateBalance(tenantId, customerId, -amount, storeId, tx);
 
+            // 1.5 Update the dynamic PartyBalance ledger to keep dashboard perfectly synced
+            const existingParty = await tx.partyBalance.findFirst({
+                where: { tenantId, storeId, partyId: customerId, partyType: 'CUSTOMER' }
+            });
+            if (existingParty) {
+                await tx.partyBalance.update({
+                    where: { id: existingParty.id },
+                    data: { currentBalance: { increment: -amount } }
+                });
+            } else {
+                await tx.partyBalance.create({
+                    data: { tenantId, storeId, partyId: customerId, partyType: 'CUSTOMER', currentBalance: -amount }
+                });
+            }
+
             // 2. Add to Cash Ledger
             await tx.cashLedger.create({
                 data: {
@@ -54,9 +70,35 @@ class CustomerService {
                 }
             });
 
+            // 3. Create a Transaction row so it appears in the Customer Statement
+            const txnNumber = await transactionService.generateTransactionNumber(tenantId, 'PAY');
+            
+            await tx.transaction.create({
+                data: {
+                    tenantId,
+                    storeId,
+                    userId,
+                    partyType: 'CUSTOMER',
+                    partyId: customerId,
+                    transactionNumber: txnNumber,
+                    type: 'PAYMENT_RECEIVED',
+                    subtotal: amount,
+                    total: amount,
+                    paymentMethod: paymentMethod || 'CASH',
+                    paymentDetails: { cash: amount },
+                    balanceTracking: {
+                        previousBalance: customer.outstandingBalance,
+                        transactionImpact: -amount,
+                        currentBalance: customer.outstandingBalance - amount
+                    },
+                    status: 'COMPLETED',
+                    notes: description
+                }
+            });
+
             // Return updated customer info
             return await customerRepository.findById(tenantId, customerId, storeId);
-        });
+        }, { maxWait: 10000, timeout: 20000 });
     }
 }
 

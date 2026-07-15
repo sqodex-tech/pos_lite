@@ -76,7 +76,7 @@ export default function TenantBillingPage() {
             if (storeId) {
                 try {
                     const itemsRes = await inventoryApi.getAll(storeId, { limit: 1 });
-                    itemsTotal = itemsRes.data?.meta?.pagination?.total || 0;
+                    itemsTotal = itemsRes.data?.meta?.pagination?.total || itemsRes.data?.meta?.total || (Array.isArray(itemsRes.data?.data) ? itemsRes.data.data.length : 0);
                 } catch (e) {
                     console.error('Failed to fetch items usage', e);
                 }
@@ -100,7 +100,7 @@ export default function TenantBillingPage() {
 
         try {
             setIsCancelling(true);
-            await subscriptionsApi.cancel(subscription._id, {
+            await subscriptionsApi.cancel(subscription._id || subscription.id || '', {
                 reason: 'User requested cancellation via dashboard',
                 immediate: cancelType === 'immediate'
             });
@@ -258,10 +258,10 @@ Thank you for your business!
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                                <StatItem icon={<Users className="w-4 h-4" />} label="Users" value={String(usage.users)} total={String(subscription?.limitsSnapshot?.maxUsers ?? subscription?.planId?.maxUsers ?? 0)} />
-                                <StatItem icon={<Layers className="w-4 h-4" />} label="Branches" value={String(usage.branches)} total={String(subscription?.limitsSnapshot?.maxBranches ?? subscription?.planId?.maxBranches ?? 0)} />
-                                <StatItem icon={<Package className="w-4 h-4" />} label="Items" value={String(usage.items)} total={String(subscription?.limitsSnapshot?.maxItems ?? subscription?.planId?.maxItems ?? 0)} />
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <StatItem icon={<Users className="w-4 h-4 text-blue-500" />} label="Users" value={String(usage.users)} total={String(subscription?.limitsSnapshot?.maxUsers ?? subscription?.planId?.maxUsers ?? 0)} />
+                                <StatItem icon={<Layers className="w-4 h-4 text-indigo-500" />} label="Branches" value={String(usage.branches)} total={String(subscription?.limitsSnapshot?.maxBranches ?? subscription?.planId?.maxBranches ?? 0)} />
+                                <StatItem icon={<Package className="w-4 h-4 text-emerald-500" />} label="Items" value={String(usage.items)} total={String(subscription?.limitsSnapshot?.maxItems ?? subscription?.planId?.maxItems ?? 0)} />
                             </div>
                         </div>
 
@@ -360,18 +360,18 @@ Thank you for your business!
                     <div className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl rounded-[2.5rem] border border-slate-200/60 dark:border-slate-700/60 shadow-xl overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="w-full text-left">
-                                <thead>
+                                <thead className="bg-slate-50/50 dark:bg-slate-800/30">
                                     <tr className="border-b border-slate-100 dark:border-slate-800">
-                                        <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-slate-400">Date</th>
-                                        <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-slate-400">Plan / Description</th>
-                                        <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-slate-400">Amount</th>
-                                        <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-slate-400">Status</th>
-                                        <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-slate-400">Action</th>
+                                        <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Date</th>
+                                        <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Plan / Description</th>
+                                        <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Amount</th>
+                                        <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Status</th>
+                                        <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {history.map((record) => (
-                                        <tr key={record._id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors duration-300">
+                                    {history.map((record, index) => (
+                                        <tr key={record._id || record.id || index} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors duration-300">
                                             <td className="px-8 py-6">
                                                 <p className="font-bold text-slate-900 dark:text-white">{new Date(record.createdAt).toLocaleDateString()}</p>
                                                 <p className="text-xs text-slate-400 font-medium">{new Date(record.createdAt).toLocaleTimeString()}</p>
@@ -450,15 +450,31 @@ Thank you for your business!
 }
 
 function StatItem({ icon, label, value, total }: { icon: React.ReactNode, label: string, value: string, total: string }) {
+    const val = parseFloat(value) || 0;
+    const tot = parseFloat(total) || 1;
+    const percent = Math.min(100, Math.max(0, (val / tot) * 100));
+
     return (
-        <div className="p-4 bg-slate-50/50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
-            <div className="flex items-center gap-2 text-slate-400 mb-2">
-                {icon}
+        <div className="p-5 bg-white/60 dark:bg-slate-900/60 rounded-3xl border border-slate-100 dark:border-slate-800 flex flex-col justify-between hover:bg-white dark:hover:bg-slate-900 transition-all duration-300 shadow-sm hover:shadow-md">
+            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 mb-4">
+                <div className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                    {icon}
+                </div>
                 <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
             </div>
-            <div className="flex items-baseline gap-1">
-                <p className="text-xl font-black text-slate-900 dark:text-white">{value}</p>
-                <p className="text-sm font-bold text-slate-400">/ {total}</p>
+            <div className="space-y-3">
+                <div className="flex items-baseline gap-1">
+                    <p className="text-2xl font-black text-slate-900 dark:text-white">{value}</p>
+                    <p className="text-xs font-bold text-slate-400">/ {total}</p>
+                </div>
+                <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${percent}%` }}
+                        transition={{ duration: 1, delay: 0.2, ease: "easeOut" }}
+                        className={`h-full rounded-full ${percent > 90 ? 'bg-rose-500' : percent > 75 ? 'bg-amber-500' : 'bg-primary'}`}
+                    />
+                </div>
             </div>
         </div>
     );

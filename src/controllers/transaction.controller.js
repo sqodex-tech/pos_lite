@@ -28,7 +28,7 @@ const getPartyStatement = async (req, res, next) => {
         const storeId = req.headers['x-store-id'];
 
         if (!startDate || !endDate) {
-            throw new ApiError(400, 'Start date and End date are required');
+            throw new ApiError(400, `Start date and End date are required. Received query: ${JSON.stringify(req.query)}`);
         }
 
         const statement = await transactionService.getPartyStatement(
@@ -60,9 +60,8 @@ const getDashboardSummary = async (req, res, next) => {
 
 const getTransactions = async (req, res, next) => {
     try {
-        const { storeId } = req.params;
-        const { page = 1, limit = 20, type } = req.query;
-        const cacheKey = `transactions_${req.tenantId}_${storeId || ''}_${page}_${limit}_${type || ''}`;
+        const { page = 1, limit = 20, type, startDate, endDate, storeId } = req.query;
+        const cacheKey = `transactions_${req.tenantId}_${storeId || ''}_${page}_${limit}_${type || ''}_${startDate || ''}_${endDate || ''}`;
 
         const cachedData = cache.get(cacheKey);
         if (cachedData) {
@@ -72,7 +71,9 @@ const getTransactions = async (req, res, next) => {
         const result = await transactionRepository.findByTenant(req.tenantId, storeId, {
             page: parseInt(page),
             limit: parseInt(limit),
-            type
+            type,
+            startDate,
+            endDate
         });
 
         const totalPages = Math.ceil(result.total / result.limit);

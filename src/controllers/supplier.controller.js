@@ -49,7 +49,7 @@ const createSupplier = async (req, res, next) => {
 
 const getSuppliers = async (req, res, next) => {
     try {
-        const { page = 1, limit = 20, search, storeId } = req.query;
+        const { page = 1, limit = 20, search, storeId, startDate, endDate } = req.query;
         // Prioritize explicit query, then RBAC context, then global interceptor
         const activeStoreId = storeId || req.permissionContext?.storeId || req.headers['x-store-id'];
         
@@ -57,7 +57,9 @@ const getSuppliers = async (req, res, next) => {
             page: parseInt(page),
             limit: parseInt(limit),
             search,
-            storeId: activeStoreId
+            storeId: activeStoreId,
+            startDate,
+            endDate
         });
 
         const totalPages = Math.ceil(result.total / result.limit);
@@ -120,11 +122,41 @@ const recordPayment = async (req, res, next) => {
     }
 };
 
+const getSupplierStats = async (req, res, next) => {
+    try {
+        const prisma = require('../config/prisma');
+        const storeId = req.query.storeId || req.permissionContext?.storeId;
+        
+        const where = { tenantId: req.tenantId, deletedAt: null };
+        if (storeId) {
+            where.storeId = storeId;
+        }
+
+        const suppliers = await prisma.supplier.findMany({
+            where,
+            select: { payableBalance: true, paymentTermsDays: true }
+        });
+
+        const stats = {
+            total: suppliers.length,
+            totalBalance: suppliers.reduce((sum, s) => sum + (s.payableBalance || 0), 0),
+            avgPaymentTerms: Math.round(suppliers.length > 0
+                ? suppliers.reduce((sum, s) => sum + (s.paymentTermsDays || 0), 0) / suppliers.length
+                : 0)
+        };
+
+        return res.status(200).json(new ApiResponse(200, stats, 'Supplier stats fetched successfully'));
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     createSupplier,
     getSuppliers,
     getSupplierById,
     updateSupplier,
     deleteSupplier,
-    recordPayment
+    recordPayment,
+    getSupplierStats
 };

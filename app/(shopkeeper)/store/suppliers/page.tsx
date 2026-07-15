@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
     Truck,
     Plus,
@@ -20,39 +21,48 @@ import { Button, Input, AccessDenied } from '@/components/UI';
 import { usePermissions, PERMISSIONS } from '@/hooks/usePermissions';
 
 export default function SuppliersPage() {
+    const router = useRouter();
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [loading, setLoading] = useState(true);
+    const [initialLoad, setInitialLoad] = useState(true);
     const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('ALL');
     const [showModal, setShowModal] = useState(false);
     const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
-    const [stats, setStats] = useState({
-        total: 0,
-        totalBalance: 0,
-        avgPaymentTerms: 0
-    });
+    const [page, setPage] = useState(1);
+    const [meta, setMeta] = useState({ total: 0, page: 1, totalPages: 1, hasMore: false });
+    const [stats, setStats] = useState({ total: 0, totalBalance: 0, avgPaymentTerms: 0 });
+
     const { hasPermission, loading: permissionsLoading } = usePermissions();
 
     useEffect(() => {
         fetchSuppliers();
-    }, []);
+    }, [page, search, statusFilter]);
 
     const fetchSuppliers = async () => {
         try {
-            const response = await suppliersApi.getAll();
+            const storeId = localStorage.getItem('storeId') || '';
+            const params: any = {
+                page,
+                limit: 20,
+                search: search || undefined
+            };
+            
+            const [response, statsRes] = await Promise.all([
+                suppliersApi.getAll(params),
+                suppliersApi.getStats(storeId)
+            ]);
+            
             const supplierData = Array.isArray(response.data.data) ? response.data.data : [];
             setSuppliers(supplierData);
-
-            // Calculate stats
-            const totalBalance = supplierData.reduce((sum: number, s: Supplier) => sum + (s.balance || 0), 0);
-            const avgPaymentTerms = supplierData.length > 0
-                ? supplierData.reduce((sum: number, s: Supplier) => sum + s.paymentTermsDays, 0) / supplierData.length
-                : 0;
-
-            setStats({
-                total: supplierData.length,
-                totalBalance,
-                avgPaymentTerms: Math.round(avgPaymentTerms)
-            });
+            
+            if (response.data.meta) {
+                setMeta(response.data.meta);
+            }
+            
+            if (statsRes.data.data) {
+                setStats(statsRes.data.data);
+            }
         } catch (error: any) {
             console.error('Fetch suppliers error:', error);
             if (error.code === 'ERR_NETWORK') {
@@ -61,6 +71,7 @@ export default function SuppliersPage() {
             setSuppliers([]);
         } finally {
             setLoading(false);
+            setInitialLoad(false);
         }
     };
 
@@ -76,13 +87,9 @@ export default function SuppliersPage() {
         }
     };
 
-    const filteredSuppliers = suppliers.filter(s =>
-        s.name.toLowerCase().includes(search.toLowerCase()) ||
-        s.email.toLowerCase().includes(search.toLowerCase()) ||
-        s.contactPerson.toLowerCase().includes(search.toLowerCase())
-    );
+    // We rely on backend stats now
 
-    if (loading || permissionsLoading) {
+    if (initialLoad || permissionsLoading) {
         return (
             <div className="flex items-center justify-center h-96">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -97,7 +104,7 @@ export default function SuppliersPage() {
     const canManage = hasPermission(PERMISSIONS.MANAGE_SUPPLIERS);
 
     return (
-        <div className="max-w-7xl mx-auto space-y-8">
+        <div className={`max-w-7xl mx-auto space-y-8 transition-opacity duration-200 ${loading ? 'opacity-50 pointer-events-none animate-pulse' : 'opacity-100'}`}>
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Suppliers</h1>
@@ -136,16 +143,33 @@ export default function SuppliersPage() {
                 </motion.div>
             </div>
 
-            {/* Search */}
-            <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                    type="text"
-                    placeholder="Search suppliers by name, email, or contact person..."
-                    className="w-full pl-12 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-primary/20"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                />
+            {/* Search and Filter */}
+            <div className="flex flex-wrap items-center gap-4">
+                <div className="relative flex-1">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    <input
+                        type="text"
+                        placeholder="Search suppliers by name, email, or contact person..."
+                        className="w-full pl-12 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-primary/20"
+                        value={search}
+                        onChange={(e) => {
+                            setSearch(e.target.value);
+                            setPage(1);
+                        }}
+                    />
+                </div>
+                <select
+                    value={statusFilter}
+                    onChange={(e) => {
+                        setStatusFilter(e.target.value);
+                        setPage(1);
+                    }}
+                    className="px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer shrink-0"
+                >
+                    <option value="ALL">All Status</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="INACTIVE">Inactive</option>
+                </select>
             </div>
 
             {/* Table */}
@@ -164,8 +188,12 @@ export default function SuppliersPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredSuppliers.map((supplier) => (
-                            <tr key={supplier.id} className="border-b border-slate-50 hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                        {suppliers.map((supplier) => (
+                            <tr 
+                                key={supplier.id} 
+                                onClick={() => router.push(`/store/suppliers/${supplier.id}`)}
+                                className="border-b border-slate-50 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 cursor-pointer"
+                            >
                                 <td className="py-4 px-4">
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
@@ -201,24 +229,24 @@ export default function SuppliersPage() {
                                     </span>
                                 </td>
                                 <td className="py-4 px-4">
-                                    <span className={`font-bold ${(supplier.balance || 0) > 0 ? 'text-rose-600' : 'text-slate-600 dark:text-slate-400'
-                                        }`}>Rs {(supplier.balance || 0).toFixed(2)}
+                                    <span className={`font-bold ${(supplier.payableBalance || 0) > 0 ? 'text-rose-600' : 'text-slate-600 dark:text-slate-400'
+                                        }`}>Rs {(supplier.payableBalance || 0).toFixed(2)}
                                     </span>
                                 </td>
                                 {canManage && (
                                     <td className="py-4 px-4 text-right">
-                                        <div className="flex gap-2 justify-end">
-                                            <button
+                                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                            <button 
                                                 onClick={() => { setSelectedSupplier(supplier); setShowModal(true); }}
-                                                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
+                                                className="p-2 text-slate-400 hover:text-primary rounded-xl transition-colors"
                                             >
-                                                <Edit className="w-4 h-4 text-slate-400" />
+                                                <Edit className="w-4 h-4" />
                                             </button>
-                                            <button
+                                            <button 
                                                 onClick={() => handleDelete(supplier.id)}
-                                                className="p-2 hover:bg-rose-50 rounded-lg"
+                                                className="p-2 text-slate-400 hover:text-rose-500 rounded-xl transition-colors"
                                             >
-                                                <Trash2 className="w-4 h-4 text-rose-400" />
+                                                <Trash2 className="w-4 h-4" />
                                             </button>
                                         </div>
                                     </td>
@@ -227,8 +255,37 @@ export default function SuppliersPage() {
                         ))}
                     </tbody>
                 </table>
+                
+                {/* Pagination Controls */}
+                {meta.totalPages > 1 && (
+                    <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                        <span className="text-sm text-slate-500 font-medium">
+                            Showing page {meta.page} of {meta.totalPages} ({meta.total} total suppliers)
+                        </span>
+                        <div className="flex gap-2">
+                            <Button 
+                                variant="secondary" 
+                                size="sm" 
+                                disabled={page === 1}
+                                onClick={() => setPage(page - 1)}
+                                className="px-4 py-2"
+                            >
+                                Previous
+                            </Button>
+                            <Button 
+                                variant="secondary" 
+                                size="sm" 
+                                disabled={!meta.hasMore}
+                                onClick={() => setPage(page + 1)}
+                                className="px-4 py-2"
+                            >
+                                Next
+                            </Button>
+                        </div>
+                    </div>
+                )}
 
-                {filteredSuppliers.length === 0 && (
+                {suppliers.length === 0 && (
                     <div className="text-center py-12">
                         <Truck className="w-16 h-16 text-slate-200 mx-auto mb-4" />
                         <p className="text-slate-400 font-medium">No suppliers found</p>

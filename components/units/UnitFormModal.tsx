@@ -43,7 +43,7 @@ export default function UnitFormModal({
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     const baseUnits = units.filter(u =>
-        u.category === formData.category && !u.baseUnit && u._id !== unit?._id
+        u.category === formData.category && !u.baseUnit && u.id !== unit?.id
     );
 
     const validateForm = () => {
@@ -99,7 +99,7 @@ export default function UnitFormModal({
             const storeId = localStorage.getItem('storeId') || '';
 
             if (unit) {
-                await unitsApi.update(unit._id, storeId, payload);
+                await unitsApi.update(unit.id, storeId, payload);
                 toast.success('Unit updated successfully');
             } else {
                 await unitsApi.create(storeId, payload);
@@ -226,7 +226,7 @@ export default function UnitFormModal({
                                 >
                                     <option value="">None (Base Unit)</option>
                                     {baseUnits.map(u => (
-                                        <option key={u._id} value={u._id}>
+                                        <option key={u.id} value={u.id}>
                                             {u.name} ({u.symbol})
                                         </option>
                                     ))}
@@ -250,7 +250,7 @@ export default function UnitFormModal({
                             <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
                                 <p className="text-sm text-blue-900">
                                     1 {formData.symbol || 'unit'} = {formData.conversionFactor}{' '}
-                                    {baseUnits.find(u => u._id === formData.baseUnit)?.symbol || 'base unit'}
+                                    {baseUnits.find(u => u.id === formData.baseUnit)?.symbol || 'base unit'}
                                 </p>
                             </div>
                         )}

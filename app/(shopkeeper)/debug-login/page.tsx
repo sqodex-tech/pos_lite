@@ -24,6 +24,7 @@ export default function DebugLoginPage() {
             addLog(`Password: ${password}`);
             
             addLog('Calling API...');
+            // @ts-ignore - Legacy debug page
             const response = await authApi.login({ email, password });
             
             addLog('✓ API call successful');

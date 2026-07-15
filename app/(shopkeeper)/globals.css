@@ -15,7 +15,7 @@
   --radius-xl: 1rem;
   --radius-2xl: 1.5rem;
 
-  --shadow-premium: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  --shadow-premium: 0 10px 30px -10px rgba(0, 0, 0, 0.05);
 }
 
 :root {

@@ -123,7 +123,7 @@ export default function TenantDetailPage() {
         if (!confirm('Are you sure you want to renew this subscription?')) return;
 
         try {
-            await subscriptionsApi.renew(activeSubscription._id);
+            await subscriptionsApi.renew(activeSubscription._id || activeSubscription.id || '');
             toast.success('Subscription renewed successfully');
             fetchTenantDetails();
         } catch (error: any) {
@@ -897,7 +897,7 @@ function CancelSubscriptionModal({ subscription, onClose, onSuccess }: {
     const handleCancel = async () => {
         setLoading(true);
         try {
-            await subscriptionsApi.cancel(subscription._id, { reason, immediate });
+            await subscriptionsApi.cancel(subscription._id || subscription.id || '', { reason, immediate });
             toast.success(`Subscription ${immediate ? 'cancelled immediately' : 'will cancel at end of period'}`);
             onSuccess();
         } catch (error: any) {
@@ -1010,7 +1010,7 @@ function ChangePlanModal({ subscription, onClose, onSuccess }: {
 
         setLoading(true);
         try {
-            await subscriptionsApi.changePlan(subscription._id, {
+            await subscriptionsApi.changePlan(subscription._id || subscription.id || '', {
                 newPlanId: selectedPlanId,
                 immediate
             });

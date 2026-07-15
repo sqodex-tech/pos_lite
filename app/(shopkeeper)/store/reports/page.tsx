@@ -23,10 +23,24 @@ import { usePermissions, PERMISSIONS } from '@/hooks/usePermissions';
 import { inventoryApi } from '@/lib/api/inventory';
 import { customersApi } from '@/lib/api/customers';
 import { expensesApi } from '@/lib/api/expenses';
+import { reportsApi } from '@/lib/api/reports';
+import {
+    ResponsiveContainer,
+    BarChart,
+    CartesianGrid,
+    XAxis,
+    YAxis,
+    Tooltip,
+    Legend,
+    Bar
+} from 'recharts';
 
 export default function ReportsPage() {
     const [loading, setLoading] = useState(true);
-    const [period, setPeriod] = useState('30');
+    const [initialLoad, setInitialLoad] = useState(true);
+    const [dateFilter, setDateFilter] = useState('1_month');
+    const [customStart, setCustomStart] = useState('');
+    const [customEnd, setCustomEnd] = useState('');
     const [stats, setStats] = useState({
         totalSales: 0,
         totalTransactions: 0,
@@ -35,14 +49,16 @@ export default function ReportsPage() {
         profitMargin: 0,
         avgTransactionValue: 0,
         topProducts: [] as any[],
-        salesByDay: [] as any[],
-        recentTransactions: [] as any[]
+        chartData: [] as any[],
+        recentTransactions: [] as any[],
+        daysDifference: 30
     });
     const { hasPermission, loading: permissionsLoading } = usePermissions();
 
     useEffect(() => {
+        if (dateFilter === 'custom' && (!customStart || !customEnd)) return;
         fetchReports();
-    }, [period]);
+    }, [dateFilter, customStart, customEnd]);
 
     const fetchReports = async () => {
         try {
@@ -54,95 +70,80 @@ export default function ReportsPage() {
                 return;
             }
 
-            // Fetch all data in parallel
-            const [transRes, invRes, custRes, expRes] = await Promise.all([
-                transactionsApi.getAll(storeId, {}).catch(() => ({ data: { data: [] } })),
-                inventoryApi.getAll(storeId).catch(() => ({ data: { data: [] } })),
-                customersApi.getAll(storeId).catch(() => ({ data: { data: [] } })),
-                expensesApi.getAll(storeId, {}).catch(() => ({ data: { data: [] } }))
-            ]);
-
-            const transactions = Array.isArray(transRes.data.data) ? transRes.data.data : [];
-            const inventory = Array.isArray(invRes.data.data) ? invRes.data.data : [];
-            const expenses = Array.isArray(expRes.data.data) ? expRes.data.data : [];
-
             // Calculate date range
-            const daysAgo = parseInt(period);
-            const startDate = new Date();
-            startDate.setDate(startDate.getDate() - daysAgo);
+            let start = new Date();
+            let end = new Date();
+            start.setHours(0, 0, 0, 0);
 
-            // Filter transactions by period
-            const periodTransactions = transactions.filter((t: any) =>
-                new Date(t.createdAt) >= startDate
-            );
-
-            // Calculate total sales
-            const totalSales = periodTransactions.reduce((sum: number, t: any) =>
-                sum + (t.totalAmount || 0), 0
-            );
-
-            // Calculate total expenses
-            const periodExpenses = expenses.filter((e: any) =>
-                new Date(e.date) >= startDate
-            );
-            const totalExpenses = periodExpenses.reduce((sum: number, e: any) =>
-                sum + (e.amount || 0), 0
-            );
-
-            // Calculate profit
-            const totalProfit = totalSales - totalExpenses;
-            const profitMargin = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
-
-            // Calculate average transaction value
-            const avgTransactionValue = periodTransactions.length > 0
-                ? totalSales / periodTransactions.length
-                : 0;
-
-            // Group sales by day
-            const salesByDay: any = {};
-            periodTransactions.forEach((t: any) => {
-                const date = new Date(t.createdAt).toLocaleDateString();
-                if (!salesByDay[date]) {
-                    salesByDay[date] = 0;
+            if (dateFilter === 'today') {
+                // start is today
+            } else if (dateFilter === '7_days') {
+                start.setDate(start.getDate() - 7);
+            } else if (dateFilter === '15_days') {
+                start.setDate(start.getDate() - 15);
+            } else if (dateFilter === '1_month') {
+                start.setMonth(start.getMonth() - 1);
+            } else if (dateFilter === '3_months') {
+                start.setMonth(start.getMonth() - 3);
+            } else if (dateFilter === 'custom') {
+                if (customStart && customEnd) {
+                    start = new Date(customStart);
+                    start.setHours(0, 0, 0, 0);
+                    end = new Date(customEnd);
+                    end.setHours(23, 59, 59, 999);
                 }
-                salesByDay[date] += t.totalAmount || 0;
-            });
+            } else {
+                start.setDate(start.getDate() - 30);
+            }
+            
+            const params: any = { storeId };
+            // Ensure we format dates as ISO strings
+            params.startDate = start.toISOString();
+            params.endDate = end.toISOString();
 
-            const salesByDayArray = Object.entries(salesByDay).map(([date, amount]) => ({
-                date,
-                amount
-            }));
-
-            // Get top products (mock data - would need transaction items)
-            const topProducts = inventory.slice(0, 5).map((item: any) => ({
-                name: item.name,
-                sales: Math.floor(Math.random() * 100),
-                revenue: item.salePrice * Math.floor(Math.random() * 50)
-            }));
+            const res = await reportsApi.getProfitLoss(params);
+            const reportData = res.data.data;
+            
+            let daysDifference = 1;
+            if (dateFilter === 'today') daysDifference = 1;
+            else if (dateFilter === '7_days') daysDifference = 7;
+            else if (dateFilter === '15_days') daysDifference = 15;
+            else if (dateFilter === '1_month') daysDifference = 30;
+            else if (dateFilter === '3_months') daysDifference = 90;
+            else if (dateFilter === 'custom' && customStart && customEnd) {
+                daysDifference = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+            }
 
             setStats({
-                totalSales,
-                totalTransactions: periodTransactions.length,
-                totalExpenses,
-                totalProfit,
-                profitMargin,
-                avgTransactionValue,
-                topProducts,
-                salesByDay: salesByDayArray,
-                recentTransactions: periodTransactions.slice(0, 10)
-            });
+                totalSales: reportData.revenue?.totalSales || 0,
+                totalTransactions: reportData.revenue?.salesCount || 0,
+                totalExpenses: reportData.costs?.totalExpenses || 0,
+                totalProfit: reportData.profit?.netProfit || 0,
+                profitMargin: reportData.profit?.profitMargin || 0,
+                avgTransactionValue: reportData.revenue?.averageSale ? Number(reportData.revenue.averageSale) : 0,
+                topProducts: [], // Need separate endpoint for top products
+                chartData: (reportData.chartData?.daily || []).map((d: any) => ({
+                    date: d.date,
+                    Sales: d.sales || 0,
+                    Expenses: d.expenses || 0,
+                    Profit: d.profit || 0
+                })),
+                recentTransactions: [], // Need separate query if we still want this
+                daysDifference
+            } as any);
         } catch (error) {
             console.error('Error fetching reports:', error);
             toast.error('Failed to load reports');
         } finally {
             setLoading(false);
+            setInitialLoad(false);
         }
     };
 
     const handleExport = () => {
         // Create CSV content
         const csvContent = [
-            ['Report Period', `Last ${period} days`],
+            ['Report Period', dateFilter],
             ['Generated', new Date().toLocaleString()],
             [''],
             ['Metric', 'Value'],
@@ -166,7 +167,7 @@ export default function ReportsPage() {
         toast.success('Report exported successfully');
     };
 
-    if (loading || permissionsLoading) {
+    if (initialLoad || permissionsLoading) {
         return (
             <div className="flex items-center justify-center h-96">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -186,18 +187,35 @@ export default function ReportsPage() {
                     <p className="text-slate-500 mt-1">View sales reports and business insights</p>
                 </div>
                 <div className="flex gap-2">
-                    {['7', '30', '90'].map((p) => (
-                        <button
-                            key={p}
-                            onClick={() => setPeriod(p)}
-                            className={`px-4 py-2 rounded-xl font-medium transition-colors ${period === p
-                                ? 'bg-primary text-white'
-                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
-                                }`}
+                        <select
+                            value={dateFilter}
+                            onChange={(e) => setDateFilter(e.target.value)}
+                            className="px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
                         >
-                            {p}d
-                        </button>
-                    ))}
+                            <option value="today">Today</option>
+                            <option value="7_days">7 Days</option>
+                            <option value="15_days">15 Days</option>
+                            <option value="1_month">1 Month</option>
+                            <option value="3_months">3 Months</option>
+                            <option value="custom">Custom Dates</option>
+                        </select>
+                        {dateFilter === 'custom' && (
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="date"
+                                    value={customStart}
+                                    onChange={(e) => setCustomStart(e.target.value)}
+                                    className="px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-primary/20"
+                                />
+                                <span className="text-slate-400 font-bold">to</span>
+                                <input
+                                    type="date"
+                                    value={customEnd}
+                                    onChange={(e) => setCustomEnd(e.target.value)}
+                                    className="px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-primary/20"
+                                />
+                            </div>
+                        )}
                     <Button onClick={handleExport} className="gap-2 ml-2">
                         <Download className="w-5 h-5" />
                         Export
@@ -213,6 +231,7 @@ export default function ReportsPage() {
                     icon={<Banknote className="w-6 h-6" />}
                     color="emerald"
                     trend={stats.totalSales > 0 ? 'up' : 'neutral'}
+                    loading={loading}
                 />
                 <MetricCard
                     title="Transactions"
@@ -220,6 +239,7 @@ export default function ReportsPage() {
                     icon={<ShoppingCart className="w-6 h-6" />}
                     color="blue"
                     trend={stats.totalTransactions > 0 ? 'up' : 'neutral'}
+                    loading={loading}
                 />
                 <MetricCard
                     title="Total Expenses"
@@ -227,6 +247,7 @@ export default function ReportsPage() {
                     icon={<Wallet className="w-6 h-6" />}
                     color="rose"
                     trend="down"
+                    loading={loading}
                 />
                 <MetricCard
                     title="Net Profit"
@@ -234,6 +255,7 @@ export default function ReportsPage() {
                     icon={<TrendingUp className="w-6 h-6" />}
                     color="purple"
                     trend={stats.totalProfit > 0 ? 'up' : 'down'}
+                    loading={loading}
                 />
             </div>
 
@@ -244,7 +266,9 @@ export default function ReportsPage() {
                         <BarChart3 className="w-5 h-5 text-blue-600" />
                         <span className="text-xs font-bold text-slate-400 uppercase">Profit Margin</span>
                     </div>
-                    <h3 className="text-3xl font-bold text-slate-900 dark:text-white">{stats.profitMargin.toFixed(2)}%</h3>
+                    <h3 className="text-3xl font-bold text-slate-900 dark:text-white">
+                        {loading ? <span className="inline-block w-24 h-8 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></span> : `${stats.profitMargin.toFixed(2)}%`}
+                    </h3>
                     <p className="text-xs text-slate-500 mt-1">
                         {stats.profitMargin > 20 ? 'Excellent' : stats.profitMargin > 10 ? 'Good' : 'Needs Improvement'}
                     </p>
@@ -254,7 +278,9 @@ export default function ReportsPage() {
                         <TrendingUp className="w-5 h-5 text-emerald-600" />
                         <span className="text-xs font-bold text-slate-400 uppercase">Avg Transaction</span>
                     </div>
-                    <h3 className="text-3xl font-bold text-slate-900 dark:text-white">Rs {stats.avgTransactionValue.toFixed(2)}</h3>
+                    <h3 className="text-3xl font-bold text-slate-900 dark:text-white">
+                        {loading ? <span className="inline-block w-24 h-8 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></span> : `Rs ${stats.avgTransactionValue.toFixed(2)}`}
+                    </h3>
                     <p className="text-xs text-slate-500 mt-1">Per transaction</p>
                 </div>
                 <div className="card-premium p-6">
@@ -262,42 +288,52 @@ export default function ReportsPage() {
                         <Calendar className="w-5 h-5 text-amber-600" />
                         <span className="text-xs font-bold text-slate-400 uppercase">Daily Average</span>
                     </div>
-                    <h3 className="text-3xl font-bold text-slate-900 dark:text-white">Rs {(stats.totalSales / parseInt(period)).toFixed(2)}
+                    <h3 className="text-3xl font-bold text-slate-900 dark:text-white">
+                        {loading ? <span className="inline-block w-24 h-8 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></span> : `Rs ${(stats.totalSales / (stats.daysDifference || 1)).toFixed(2)}`}
                     </h3>
                     <p className="text-xs text-slate-500 mt-1">Per day</p>
                 </div>
             </div>
 
-            {/* Sales Trend Chart */}
-            {stats.salesByDay.length > 0 && (
+
+            {/* Professional Analytics Chart */}
+            {stats.chartData.length > 0 && (
                 <div className="card-premium p-6">
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-3">
-                            <TrendingUp className="w-6 h-6 text-primary" />
-                            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Sales Trend</h2>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-sm text-slate-500">Total Revenue</p>
-                            <p className="text-2xl font-bold text-primary">Rs {stats.totalSales.toFixed(2)}</p>
+                            <BarChart3 className="w-6 h-6 text-primary" />
+                            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Revenue & Expenses Overview</h2>
                         </div>
                     </div>
-                    <div className="h-64 flex items-end gap-2">
-                        {stats.salesByDay.slice(-30).map((item: any, index: number) => {
-                            const maxSales = Math.max(...stats.salesByDay.map((s: any) => s.amount));
-                            const height = maxSales > 0 ? (item.amount / maxSales) * 100 : 0;
-                            return (
-                                <div
-                                    key={index}
-                                    className="flex-1 bg-primary/20 hover:bg-primary/40 rounded-t transition-all cursor-pointer group relative"
-                                    style={{ height: `${height}%`, minHeight: '4px' }}
-                                >
-                                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">Rs {item.amount.toFixed(2)}
-                                        <br />
-                                        {item.date}
-                                    </div>
-                                </div>
-                            );
-                        })}
+                    <div className="h-[400px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={stats.chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                <XAxis 
+                                    dataKey="date" 
+                                    axisLine={false} 
+                                    tickLine={false} 
+                                    tick={{ fill: '#64748b', fontSize: 12 }} 
+                                    dy={10} 
+                                />
+                                <YAxis 
+                                    axisLine={false} 
+                                    tickLine={false} 
+                                    tick={{ fill: '#64748b', fontSize: 12 }} 
+                                    dx={-10} 
+                                    tickFormatter={(value) => `Rs ${value}`} 
+                                />
+                                <Tooltip
+                                    cursor={{ fill: 'transparent' }}
+                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
+                                    itemStyle={{ fontSize: '14px', fontWeight: 600 }}
+                                />
+                                <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                                <Bar dataKey="Sales" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={50} />
+                                <Bar dataKey="Expenses" fill="#f43f5e" radius={[4, 4, 0, 0]} maxBarSize={50} />
+                                <Bar dataKey="Profit" fill="#8b5cf6" radius={[4, 4, 0, 0]} maxBarSize={50} />
+                            </BarChart>
+                        </ResponsiveContainer>
                     </div>
                 </div>
             )}
@@ -322,7 +358,7 @@ export default function ReportsPage() {
                                         <p className="text-xs text-slate-500">{product.sales} units sold</p>
                                     </div>
                                 </div>
-                                <p className="font-bold text-primary">Rs {product.revenue.toFixed(2)}</p>
+                                <p className="font-bold text-primary">Rs {(product.revenue || 0).toFixed(2)}</p>
                             </div>
                         ))}
                     </div>
@@ -335,18 +371,18 @@ export default function ReportsPage() {
                         <h2 className="text-xl font-bold text-slate-900 dark:text-white">Recent Transactions</h2>
                     </div>
                     <div className="space-y-3">
-                        {stats.recentTransactions.slice(0, 5).map((transaction: any) => (
-                            <div key={transaction._id} className="flex items-center justify-between p-3 bg-emerald-50 rounded-xl">
+                        {stats.recentTransactions.slice(0, 5).map((transaction: any, idx: number) => (
+                            <div key={transaction.id || transaction._id || idx} className="flex items-center justify-between p-3 bg-emerald-50 rounded-xl">
                                 <div>
                                     <p className="font-medium text-slate-900 dark:text-white">
-                                        Transaction #{transaction._id.slice(-6)}
+                                        Transaction #{(transaction.transactionNumber || transaction._id || transaction.id || '').slice(-6)}
                                     </p>
                                     <p className="text-xs text-slate-500">
                                         {new Date(transaction.createdAt).toLocaleString()}
                                     </p>
                                 </div>
                                 <div className="text-right">
-                                    <p className="font-bold text-emerald-600">Rs {transaction.totalAmount.toFixed(2)}
+                                    <p className="font-bold text-emerald-600">Rs {(transaction.total || transaction.totalAmount || 0).toFixed(2)}
                                     </p>
                                     <p className="text-xs text-slate-500">{transaction.paymentMethod}</p>
                                 </div>
@@ -399,12 +435,13 @@ export default function ReportsPage() {
     );
 }
 
-function MetricCard({ title, value, icon, color, trend }: {
+function MetricCard({ title, value, icon, color, trend, loading }: {
     title: string;
     value: string;
     icon: React.ReactNode;
     color: 'emerald' | 'blue' | 'rose' | 'purple';
     trend: 'up' | 'down' | 'neutral';
+    loading?: boolean;
 }) {
     const colorClasses = {
         emerald: 'from-emerald-500 to-emerald-600',
@@ -435,7 +472,9 @@ function MetricCard({ title, value, icon, color, trend }: {
                 )}
             </div>
             <p className="text-sm text-slate-500 mb-1">{title}</p>
-            <p className="text-3xl font-bold text-slate-900 dark:text-white">{value}</p>
+            <p className="text-3xl font-bold text-slate-900 dark:text-white">
+                {loading ? <span className="inline-block w-24 h-8 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></span> : value}
+            </p>
         </motion.div>
     );
 }

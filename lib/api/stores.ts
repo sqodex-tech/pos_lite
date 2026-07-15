@@ -50,7 +50,7 @@ export const storesApi = {
 
     delete: (id: string) => api.delete(`/stores/${id}`),
 
-    getStats: (id: string) => api.get(`/stores/${id}/stats`),
+    getStats: (id: string, params?: any) => api.get(`/stores/${id}/stats`, { params }),
 };
 
 // ── Super Admin Cross-Tenant Store API ──

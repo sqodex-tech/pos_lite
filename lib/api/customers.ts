@@ -7,6 +7,8 @@ export interface Customer {
     phone: string;
     customerType: 'RETAIL' | 'WHOLESALE';
     outstandingBalance?: number; // Added for balance tracking
+    periodSales?: number; // Added for date-filtered sales
+    periodPayments?: number; // Added for date-filtered payments
     storeId: string;
 }
 
@@ -26,4 +28,7 @@ export const customersApi = {
 
     recordPayment: (storeId: string, customerId: string, data: any) =>
         api.post(`/customers/store/${storeId}/${customerId}/payment`, { ...data, storeId }),
+
+    getStats: (storeId: string) => 
+        api.get('/customers/stats', { params: { storeId } }),
 };

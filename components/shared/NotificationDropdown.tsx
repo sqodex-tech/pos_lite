@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Bell, CheckCircle2, Circle, X, Trash2 } from 'lucide-react';
+import { Bell, CheckCircle2, Circle, X, Trash2, Settings } from 'lucide-react';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNotifications, Notification } from '@/hooks/useNotifications';
 import { formatDistanceToNow } from 'date-fns';
@@ -54,14 +55,24 @@ export function NotificationDropdown() {
                   </span>
                 )}
               </h3>
-              {unreadCount > 0 && (
-                <button 
-                  onClick={() => markAllAsRead()}
-                  className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 font-medium"
+              <div className="flex items-center gap-3">
+                {unreadCount > 0 && (
+                  <button 
+                    onClick={() => markAllAsRead()}
+                    className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 font-medium"
+                  >
+                    Mark all read
+                  </button>
+                )}
+                <Link 
+                  href="/store/settings" 
+                  onClick={() => setIsOpen(false)}
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors flex items-center"
+                  title="Notification Settings"
                 >
-                  Mark all read
-                </button>
-              )}
+                  <Settings className="w-4 h-4" />
+                </Link>
+              </div>
             </div>
 
             <div className="max-h-[400px] overflow-y-auto">

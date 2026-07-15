@@ -22,7 +22,17 @@ const getExpenses = async (req, res, next) => {
 
         const cachedData = cache.get(cacheKey);
         if (cachedData) {
-            return res.status(200).json(new ApiResponse(200, cachedData.expenses, 'Expenses fetched successfully (cached)', cachedData.meta));
+            const mappedCached = cachedData.expenses.map(e => ({
+                _id: e.id,
+                description: e.description,
+                amount: e.amount,
+                category: e.category?.name || 'General',
+                date: e.expenseDate,
+                storeId: e.storeId,
+                createdBy: e.createdById,
+                status: e.status || 'COMPLETED'
+            }));
+            return res.status(200).json(new ApiResponse(200, mappedCached, 'Expenses fetched successfully (cached)', cachedData.meta));
         }
 
         const result = await expenseRepository.findByTenant(req.tenantId, {
@@ -39,7 +49,18 @@ const getExpenses = async (req, res, next) => {
 
         cache.set(cacheKey, { expenses: result.expenses, meta });
 
-        return res.status(200).json(new ApiResponse(200, result.expenses, 'Expenses fetched successfully', meta));
+        const mappedExpenses = result.expenses.map(e => ({
+            _id: e.id,
+            description: e.description,
+            amount: e.amount,
+            category: e.category?.name || 'General',
+            date: e.expenseDate,
+            storeId: e.storeId,
+            createdBy: e.createdById,
+            status: e.status || 'COMPLETED'
+        }));
+
+        return res.status(200).json(new ApiResponse(200, mappedExpenses, 'Expenses fetched successfully', meta));
     } catch (error) {
         next(error);
     }

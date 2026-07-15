@@ -22,7 +22,10 @@ export default function InventoryPage() {
     const [brands, setBrands] = useState<Brand[]>([]);
     const [units, setUnits] = useState<Unit[]>([]);
     const [loading, setLoading] = useState(true);
+    const [initialLoad, setInitialLoad] = useState(true);
     const [search, setSearch] = useState('');
+    const [page, setPage] = useState(1);
+    const [meta, setMeta] = useState({ total: 0, page: 1, totalPages: 1, hasMore: false });
     const [showModal, setShowModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState<Item | null>(null);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
@@ -59,6 +62,9 @@ export default function InventoryPage() {
 
     useEffect(() => {
         fetchItems();
+    }, [page, search, filters]);
+
+    useEffect(() => {
         fetchCategories();
         fetchBrands();
         fetchUnits();
@@ -97,22 +103,28 @@ export default function InventoryPage() {
     const fetchItems = async () => {
         try {
             const storeId = localStorage.getItem('storeId') || '';
-            const response = await inventoryApi.getAll(storeId, { limit: 1000 });
+            
+            const params: any = {
+                page,
+                limit: 20,
+                search: search || undefined
+            };
+            
+            const [response, statsRes] = await Promise.all([
+                inventoryApi.getAll(storeId, params),
+                inventoryApi.getStats(storeId)
+            ]);
+            
             const itemData = Array.isArray(response.data.data) ? response.data.data : [];
             setItems(itemData);
+            
+            if (response.data.meta) {
+                setMeta(response.data.meta);
+            }
 
-            const expired = itemData.filter((i: Item) => i.expiryDate && new Date(i.expiryDate) < new Date()).length;
-            const lowStock = itemData.filter((i: Item) => (i.stock?.quantity || 0) <= (i.lowStockAlert || 0)).length;
-            const totalValue = itemData.reduce((sum: number, i: Item) =>
-                sum + ((i.stock?.quantity || 0) * (i.purchasePrice || 0)), 0
-            );
-
-            setStats({
-                total: itemData.length,
-                expired,
-                lowStock,
-                totalValue
-            });
+            if (statsRes.data.data) {
+                setStats(statsRes.data.data);
+            }
         } catch (error: any) {
             console.error('Fetch inventory error:', error);
 
@@ -125,6 +137,7 @@ export default function InventoryPage() {
             setItems([]);
         } finally {
             setLoading(false);
+            setInitialLoad(false);
         }
     };
 
@@ -237,7 +250,7 @@ export default function InventoryPage() {
         return sortOrder === 'asc' ? comparison : -comparison;
     });
 
-    if (loading || permissionsLoading) {
+    if (initialLoad || permissionsLoading) {
         return (
             <div className="flex items-center justify-center h-96">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -252,7 +265,7 @@ export default function InventoryPage() {
     const canManage = hasPermission(PERMISSIONS.MANAGE_INVENTORY);
 
     return (
-        <div className="max-w-7xl mx-auto space-y-8 pb-24">
+        <div className={`max-w-7xl mx-auto space-y-8 pb-24 transition-opacity duration-200 ${loading ? 'opacity-50 pointer-events-none animate-pulse' : 'opacity-100'}`}>
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Inventory Management</h1>
@@ -480,12 +493,15 @@ export default function InventoryPage() {
                                                     >
                                                         <Edit className="w-4 h-4 text-slate-400" />
                                                     </button>
-                                                    <button
-                                                        onClick={() => handleDelete(item.id)}
-                                                        className="p-2 hover:bg-rose-50 rounded-lg transition-colors"
-                                                    >
-                                                        <Trash2 className="w-4 h-4 text-rose-400" />
-                                                    </button>
+                                                    {hasPermission(PERMISSIONS.MANAGE_INVENTORY) && (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
+                                                            className="p-2 hover:bg-rose-50 dark:hover:bg-rose-500/10 text-rose-500 rounded-xl transition-colors"
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         )}
@@ -494,6 +510,35 @@ export default function InventoryPage() {
                             })}
                         </tbody>
                     </table>
+
+                    {/* Pagination Controls */}
+                    {meta.totalPages > 1 && (
+                        <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                            <span className="text-sm text-slate-500 font-medium">
+                                Showing page {meta.page} of {meta.totalPages} ({meta.total} total items)
+                            </span>
+                            <div className="flex gap-2">
+                                <Button 
+                                    variant="secondary" 
+                                    size="sm" 
+                                    disabled={page === 1}
+                                    onClick={() => setPage(page - 1)}
+                                    className="px-4 py-2"
+                                >
+                                    Previous
+                                </Button>
+                                <Button 
+                                    variant="secondary" 
+                                    size="sm" 
+                                    disabled={!meta.hasMore}
+                                    onClick={() => setPage(page + 1)}
+                                    className="px-4 py-2"
+                                >
+                                    Next
+                                </Button>
+                            </div>
+                        </div>
+                    )}
 
                     {filteredItems.length === 0 && (
                         <div className="text-center py-12">

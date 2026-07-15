@@ -11,50 +11,60 @@ import {
     Phone,
     Banknote,
     UserCheck,
-    TrendingUp
+    TrendingUp,
+    Receipt,
+    X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
 import { customersApi, Customer } from '@/lib/api/customers';
 import { Button, Input, AccessDenied } from '@/components/UI';
 import { usePermissions, PERMISSIONS } from '@/hooks/usePermissions';
 
 export default function CustomersPage() {
+    const router = useRouter();
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [loading, setLoading] = useState(true);
+    const [initialLoad, setInitialLoad] = useState(true);
     const [search, setSearch] = useState('');
+    const [typeFilter, setTypeFilter] = useState('ALL');
     const [showModal, setShowModal] = useState(false);
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-    const [stats, setStats] = useState({
-        total: 0,
-        retail: 0,
-        wholesale: 0,
-        totalBalance: 0
-    });
+    const [page, setPage] = useState(1);
+    const [meta, setMeta] = useState({ total: 0, page: 1, totalPages: 1, hasMore: false });
+    const [stats, setStats] = useState({ total: 0, retail: 0, wholesale: 0, totalBalance: 0 });
+
     const { hasPermission, loading: permissionsLoading } = usePermissions();
 
     useEffect(() => {
         fetchCustomers();
-    }, []);
+    }, [page, search, typeFilter]);
 
     const fetchCustomers = async () => {
         try {
             const storeId = localStorage.getItem('storeId') || '';
-            const response = await customersApi.getAll(storeId);
+            const params: any = {
+                page,
+                limit: 20,
+                search: search || undefined
+            };
+            
+            const [response, statsRes] = await Promise.all([
+                customersApi.getAll(storeId, params),
+                customersApi.getStats(storeId)
+            ]);
+            
             const customerData = Array.isArray(response.data.data) ? response.data.data : [];
             setCustomers(customerData);
-
-            // Calculate stats
-            const retail = customerData.filter((c: Customer) => c.customerType === 'RETAIL').length;
-            const wholesale = customerData.filter((c: Customer) => c.customerType === 'WHOLESALE').length;
-            const totalBalance = customerData.reduce((sum: number, c: Customer) => sum + (c.balance || 0), 0);
-
-            setStats({
-                total: customerData.length,
-                retail,
-                wholesale,
-                totalBalance
-            });
+            
+            if (response.data.meta) {
+                setMeta(response.data.meta);
+            }
+            
+            if (statsRes.data.data) {
+                setStats(statsRes.data.data);
+            }
         } catch (error: any) {
             console.error('Fetch customers error:', error);
             if (error.code === 'ERR_NETWORK') {
@@ -63,6 +73,7 @@ export default function CustomersPage() {
             setCustomers([]);
         } finally {
             setLoading(false);
+            setInitialLoad(false);
         }
     };
 
@@ -78,13 +89,9 @@ export default function CustomersPage() {
         }
     };
 
-    const filteredCustomers = customers.filter(c =>
-        c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.email.toLowerCase().includes(search.toLowerCase()) ||
-        c.phone.includes(search)
-    );
+    // We rely on backend stats now
 
-    if (loading || permissionsLoading) {
+    if (initialLoad || permissionsLoading) {
         return (
             <div className="flex items-center justify-center h-96">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -99,8 +106,8 @@ export default function CustomersPage() {
     const canManage = hasPermission(PERMISSIONS.MANAGE_CUSTOMERS);
 
     return (
-        <div className="max-w-7xl mx-auto space-y-8">
-            <div className="flex items-center justify-between">
+        <div className={`max-w-7xl mx-auto space-y-8 transition-opacity duration-200 ${loading ? 'opacity-50 pointer-events-none animate-pulse' : 'opacity-100'}`}>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Customers</h1>
                     <p className="text-slate-500 mt-1">Manage your customer database</p>
@@ -145,16 +152,33 @@ export default function CustomersPage() {
                 </motion.div>
             </div>
 
-            {/* Search */}
-            <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                    type="text"
-                    placeholder="Search customers by name, email, or phone..."
-                    className="w-full pl-12 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 text-slate-700 dark:text-slate-300"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                />
+            {/* Search and Filter */}
+            <div className="flex flex-wrap items-center gap-4">
+                <div className="relative flex-1">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    <input
+                        type="text"
+                        placeholder="Search customers by name, email, or phone..."
+                        className="w-full pl-12 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 text-slate-700 dark:text-slate-300"
+                        value={search}
+                        onChange={(e) => {
+                            setSearch(e.target.value);
+                            setPage(1);
+                        }}
+                    />
+                </div>
+                <select
+                    value={typeFilter}
+                    onChange={(e) => {
+                        setTypeFilter(e.target.value);
+                        setPage(1);
+                    }}
+                    className="px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer shrink-0"
+                >
+                    <option value="ALL">All Types</option>
+                    <option value="RETAIL">Retail</option>
+                    <option value="WHOLESALE">Wholesale</option>
+                </select>
             </div>
 
             {/* Table */}
@@ -172,8 +196,12 @@ export default function CustomersPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredCustomers.map((customer) => (
-                            <tr key={customer.id} className="border-b border-slate-50 hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                        {customers.map((customer) => (
+                            <tr 
+                                key={customer.id} 
+                                onClick={() => router.push(`/store/customers/${customer.id}`)}
+                                className="border-b border-slate-50 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 cursor-pointer"
+                            >
                                 <td className="py-4 px-4">
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
@@ -199,17 +227,18 @@ export default function CustomersPage() {
                                         {customer.customerType}
                                     </span>
                                 </td>
-                                <td className="py-4 px-4">
-                                    <span className={`font-bold ${(customer.balance || 0) > 0 ? 'text-rose-600' : 'text-slate-600 dark:text-slate-400'
-                                        }`}>Rs {(customer.balance || 0).toFixed(2)}
+                                <td className="py-3 px-4">
+                                    <span className={`font-bold ${(customer.outstandingBalance || 0) > 0 ? 'text-rose-600' : 'text-slate-900 dark:text-white'}`}>
+                                        Rs {Math.abs(customer.outstandingBalance || 0).toFixed(2)}
                                     </span>
                                 </td>
                                 {canManage && (
-                                    <td className="py-4 px-4 text-right">
+                                    <td className="py-4 px-4 text-right" onClick={(e) => e.stopPropagation()}>
                                         <div className="flex gap-2 justify-end">
                                             <button
                                                 onClick={() => { setSelectedCustomer(customer); setShowModal(true); }}
                                                 className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
+                                                title="Edit Customer"
                                             >
                                                 <Edit className="w-4 h-4 text-slate-400" />
                                             </button>
@@ -227,7 +256,36 @@ export default function CustomersPage() {
                     </tbody>
                 </table>
 
-                {filteredCustomers.length === 0 && (
+                {/* Pagination Controls */}
+                {meta.totalPages > 1 && (
+                    <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                        <span className="text-sm text-slate-500 font-medium">
+                            Showing page {meta.page} of {meta.totalPages} ({meta.total} total customers)
+                        </span>
+                        <div className="flex gap-2">
+                            <Button 
+                                variant="secondary" 
+                                size="sm" 
+                                disabled={page === 1}
+                                onClick={() => setPage(page - 1)}
+                                className="px-4 py-2"
+                            >
+                                Previous
+                            </Button>
+                            <Button 
+                                variant="secondary" 
+                                size="sm" 
+                                disabled={!meta.hasMore}
+                                onClick={() => setPage(page + 1)}
+                                className="px-4 py-2"
+                            >
+                                Next
+                            </Button>
+                        </div>
+                    </div>
+                )}
+                
+                {customers.length === 0 && (
                     <div className="text-center py-12">
                         <Users className="w-16 h-16 text-slate-200 mx-auto mb-4" />
                         <p className="text-slate-400 font-medium">No customers found</p>
@@ -340,3 +398,5 @@ function CustomerModal({ customer, onClose, onSuccess }: any) {
         </div>
     );
 }
+
+

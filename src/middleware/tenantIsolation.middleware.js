@@ -59,10 +59,10 @@ const validateTenantAccess = (resourceTenantIdField = 'tenantId') => {
  */
 const validateStoreAccess = async (req, res, next) => {
     try {
-        // Get store ID from request (query, body, or params)
         const storeId = (req.params && req.params.storeId) ||
             (req.body && req.body.storeId) ||
-            (req.query && req.query.storeId);
+            (req.query && req.query.storeId) ||
+            (req.headers && req.headers['x-store-id']);
 
         if (!storeId) {
             throw new ApiError(400, 'storeId is required. Please provide storeId in query parameter, request body, or route parameter.');

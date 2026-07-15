@@ -14,6 +14,9 @@ router.use(validateStoreAccess);
 // Create Customer
 router.post('/store/:storeId', requireModuleAccess('customers', 'create'), validate(createCustomerSchema), customerController.createCustomer);
 
+// Get Stats
+router.get('/stats', requireModuleAccess('customers', 'view'), customerController.getCustomerStats);
+
 // Get all Customers
 router.get('/', requireModuleAccess('customers', 'view'), customerController.getCustomers);
 

@@ -106,9 +106,9 @@ export default function ApprovalsPage() {
                 <AnimatePresence>
                     {filteredSubscriptions.map((sub) => (
                         <ApprovalCard
-                            key={sub._id}
+                            key={sub._id || sub.id}
                             subscription={sub}
-                            onApprove={() => handleApprove(sub._id)}
+                            onApprove={() => handleApprove(sub._id || sub.id || '')}
                         />
                     ))}
                 </AnimatePresence>

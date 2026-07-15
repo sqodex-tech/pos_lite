@@ -7,7 +7,10 @@ export interface Supplier {
     email: string;
     phone: string;
     paymentTermsDays: number;
-    balance: number;
+    payableBalance: number;
+    status: 'ACTIVE' | 'INACTIVE';
+    periodPurchases?: number;
+    periodPayments?: number;
     storeId: string;
 }
 
@@ -28,4 +31,7 @@ export const suppliersApi = {
 
     recordPayment: (storeId: string, supplierId: string, data: any) =>
         api.post(`/suppliers/store/${storeId}/${supplierId}/payment`, { ...data, storeId }),
+
+    getStats: (storeId: string) => 
+        api.get('/suppliers/stats', { params: { storeId } }),
 };

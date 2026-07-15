@@ -1,12 +1,16 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Settings, Shield, Bell, Database, Globe, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { 
+    Settings, Shield, Bell, Database, Globe, ArrowRight, CheckCircle2, 
+    Users, Key, Tags, Bookmark, Scale, CreditCard 
+} from 'lucide-react';
 import { Button, Input } from '@/components/UI';
 import { usePermissions } from '@/hooks/usePermissions';
 import { subscriptionsApi, Subscription } from '@/lib/api/subscriptions';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 
 export default function AdminSettingsPage() {
     const { user: authUser } = usePermissions();
@@ -34,13 +38,13 @@ export default function AdminSettingsPage() {
     };
 
     return (
-        <div className="max-w-4xl mx-auto space-y-8 pb-20">
+        <div className="max-w-5xl mx-auto space-y-10 pb-20">
             <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
             >
-                <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">System Settings</h1>
-                <p className="text-slate-500 font-medium mt-1">Configure your store and subscription preferences.</p>
+                <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">Settings Hub</h1>
+                <p className="text-slate-500 font-medium mt-2">Configure your store, manage team members, and set up your inventory preferences.</p>
             </motion.div>
 
             {/* Subscription & Billing Section */}
@@ -55,7 +59,7 @@ export default function AdminSettingsPage() {
                 <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-8 relative z-10">
                     <div className="flex items-center gap-4 text-center md:text-left">
                         <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center shrink-0">
-                            <Settings className="w-7 h-7 text-primary" />
+                            <CreditCard className="w-7 h-7 text-primary" />
                         </div>
                         <div>
                             <h2 className="text-xl font-black text-slate-900 dark:text-white">Subscription & Billing</h2>
@@ -66,7 +70,7 @@ export default function AdminSettingsPage() {
                         <Button
                             variant="secondary"
                             onClick={() => router.push('/store/billing')}
-                            className="rounded-2xl font-black bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700"
+                            className="rounded-2xl font-black text-slate-900 dark:text-white bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700"
                         >
                             View Billing
                         </Button>
@@ -102,52 +106,87 @@ export default function AdminSettingsPage() {
                 </div>
             </motion.div>
 
-            {/* Other Settings Sections (Stylized) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <SettingsGridCard
-                    icon={<Shield className="w-5 h-5 text-indigo-500" />}
-                    title="Security"
-                    description="2FA, login history, and API keys"
-                />
-                <SettingsGridCard
-                    icon={<Bell className="w-5 h-5 text-amber-500" />}
-                    title="Notifications"
-                    description="Email and push alert preferences"
-                />
-                <SettingsGridCard
-                    icon={<Database className="w-5 h-5 text-rose-500" />}
-                    title="Data & Backups"
-                    description="Export data and manage backups"
-                />
-                <SettingsGridCard
-                    icon={<Globe className="w-5 h-5 text-emerald-500" />}
-                    title="Store Profile"
-                    description="Domain, language, and currency"
-                />
-            </div>
+            {/* Application Configuration Sections */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                
+                {/* Organization Settings */}
+                <div className="space-y-4">
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <Shield className="w-5 h-5 text-indigo-500" /> Organization & Team
+                    </h3>
+                    <div className="grid gap-4">
+                        <SettingsGridCard
+                            icon={<Users className="w-5 h-5 text-blue-500" />}
+                            title="Users & Staff"
+                            description="Manage your team members and staff accounts"
+                            onClick={() => router.push('/store/users')}
+                        />
+                        <SettingsGridCard
+                            icon={<Key className="w-5 h-5 text-indigo-500" />}
+                            title="Roles & Permissions"
+                            description="Configure access control and user roles"
+                            onClick={() => router.push('/store/permissions')}
+                        />
+                        <SettingsGridCard
+                            icon={<Globe className="w-5 h-5 text-emerald-500" />}
+                            title="Store Profile"
+                            description="Update your store details, address, and logo"
+                            onClick={() => toast.error('Store Profile page under construction')}
+                        />
+                    </div>
+                </div>
 
-            <div className="flex justify-end pt-4">
-                <Button className="px-12 py-6 rounded-[2rem] font-black text-lg shadow-2xl hover:scale-105 transition-transform">
-                    Save All Changes
-                </Button>
+                {/* Inventory & Products Settings */}
+                <div className="space-y-4">
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <Database className="w-5 h-5 text-amber-500" /> Inventory Configuration
+                    </h3>
+                    <div className="grid gap-4">
+                        <SettingsGridCard
+                            icon={<Tags className="w-5 h-5 text-orange-500" />}
+                            title="Product Categories"
+                            description="Organize your products with categories"
+                            onClick={() => router.push('/store/categories')}
+                        />
+                        <SettingsGridCard
+                            icon={<Bookmark className="w-5 h-5 text-pink-500" />}
+                            title="Brands"
+                            description="Manage product brands and manufacturers"
+                            onClick={() => router.push('/store/brands')}
+                        />
+                        <SettingsGridCard
+                            icon={<Scale className="w-5 h-5 text-teal-500" />}
+                            title="Measurement Units"
+                            description="Configure units like kg, pcs, liters, etc."
+                            onClick={() => router.push('/store/units')}
+                        />
+                    </div>
+                </div>
+
             </div>
         </div>
     );
 }
 
-function SettingsGridCard({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) {
+function SettingsGridCard({ icon, title, description, onClick }: { icon: React.ReactNode, title: string, description: string, onClick?: () => void }) {
     return (
         <motion.div
-            whileHover={{ y: -5 }}
-            className="card-premium p-6 group cursor-pointer hover:border-primary/30 transition-all duration-300"
+            whileHover={{ y: -2 }}
+            onClick={onClick}
+            className="card-premium p-5 group cursor-pointer hover:border-primary/30 hover:shadow-lg transition-all duration-300 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl"
         >
-            <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 group-hover:bg-primary/5 rounded-2xl flex items-center justify-center transition-colors duration-300">
-                    {icon}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 group-hover:bg-primary/5 rounded-xl flex items-center justify-center transition-colors duration-300 shrink-0">
+                        {icon}
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors duration-300">{title}</h3>
+                        <p className="text-xs text-slate-500 font-medium mt-0.5">{description}</p>
+                    </div>
                 </div>
-                <div>
-                    <h3 className="font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors duration-300">{title}</h3>
-                    <p className="text-xs text-slate-500 font-medium">{description}</p>
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ArrowRight className="w-5 h-5 text-primary" />
                 </div>
             </div>
         </motion.div>

@@ -103,7 +103,7 @@ export default function ItemFormModal({
         const lowStock = parseInt(formData.lowStockAlert);
         if (isNaN(lowStock) || lowStock < 0) newErrors.lowStockAlert = 'Valid low stock alert is required';
 
-        const stockMod = parseInt(formData.stockModifier);
+        const stockMod = parseFloat(formData.stockModifier);
         if (isNaN(stockMod) || stockMod < 0) newErrors.stockModifier = 'Must be a valid positive number';
 
         if (!formData.categoryId) newErrors.categoryId = 'Category is required';
@@ -138,7 +138,7 @@ export default function ItemFormModal({
                 storeId 
             };
 
-            const stockModValue = parseInt(formData.stockModifier);
+            const stockModValue = parseFloat(formData.stockModifier);
             if (!isNaN(stockModValue) && stockModValue > 0) {
                 if (item) {
                     payload.addStock = stockModValue;
@@ -436,6 +436,7 @@ export default function ItemFormModal({
                                             label={item ? "Add Stock (Incremental)" : "Initial Stock"}
                                             icon={<Plus className="w-5 h-5" />}
                                             type="number"
+                                            step="any"
                                             value={formData.stockModifier}
                                             onChange={(e) => setFormData({ ...formData, stockModifier: e.target.value })}
                                             placeholder="0"

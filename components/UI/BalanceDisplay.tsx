@@ -13,6 +13,7 @@ interface BalanceDisplayProps {
     showBreakdown?: boolean;
     balanceBreakdown?: BalanceBreakdown;
     className?: string;
+    size?: 'sm' | 'md' | 'lg';
 }
 
 const BalanceDisplay: React.FC<BalanceDisplayProps> = ({ 
@@ -20,7 +21,8 @@ const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
     partyType, 
     showBreakdown = false, 
     balanceBreakdown,
-    className = "" 
+    className = "",
+    size = 'md'
 }) => {
     const formatBalance = (amount: number, type: 'CUSTOMER' | 'SUPPLIER') => {
         if (type === 'CUSTOMER') {
@@ -34,7 +36,7 @@ const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
                 };
             } else if (amount < 0) {
                 return {
-                    sign: '-',
+                    sign: '',
                     color: 'text-emerald-600',
                     text: `${Math.abs(amount).toFixed(2)} (Credit)`,
                     bgColor: 'bg-emerald-50',
@@ -44,7 +46,7 @@ const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
         } else if (type === 'SUPPLIER') {
             if (amount < 0) {
                 return {
-                    sign: '-',
+                    sign: '',
                     color: 'text-orange-600',
                     text: `${Math.abs(amount).toFixed(2)} (Payable)`,
                     bgColor: 'bg-orange-50',
@@ -72,18 +74,44 @@ const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
 
     const formatted = formatBalance(balance, partyType);
 
+    const sizeConfig = {
+        sm: {
+            padding: 'p-2',
+            amount: 'text-lg',
+            label: 'text-[9px]',
+            iconBox: 'w-8 h-8',
+            icon: 'text-sm'
+        },
+        md: {
+            padding: 'p-3',
+            amount: 'text-xl',
+            label: 'text-[10px]',
+            iconBox: 'w-10 h-10',
+            icon: 'text-lg'
+        },
+        lg: {
+            padding: 'p-4',
+            amount: 'text-2xl',
+            label: 'text-xs',
+            iconBox: 'w-12 h-12',
+            icon: 'text-xl'
+        }
+    };
+    
+    const sc = sizeConfig[size];
+
     return (
-        <div className={`p-4 rounded-2xl border border-slate-100 transition-all ${formatted.bgColor} ${className}`}>
+        <div className={`${sc.padding} rounded-2xl border border-slate-100 transition-all ${formatted.bgColor} ${className}`}>
             <div className="flex justify-between items-center">
                 <div className="space-y-0.5">
-                    <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
+                    <p className={`${sc.label} uppercase tracking-wider font-bold text-slate-400`}>
                         {formatted.label}
                     </p>
-                    <p className={`text-2xl font-black ${formatted.color}`}>
-                        {formatted.sign}${formatted.text}
+                    <p className={`${sc.amount} font-black ${formatted.color}`}>
+                        {formatted.sign}Rs {formatted.text}
                     </p>
                 </div>
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-white shadow-sm text-lg`}>
+                <div className={`${sc.iconBox} rounded-full flex items-center justify-center bg-white shadow-sm ${sc.icon}`}>
                     {partyType === 'CUSTOMER' ? '👤' : '🚛'}
                 </div>
             </div>

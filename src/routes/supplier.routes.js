@@ -14,6 +14,9 @@ router.use(validateStoreAccess);
 // Create Supplier
 router.post('/store/:storeId', requireModuleAccess('suppliers', 'create'), validate(createSupplierSchema), supplierController.createSupplier);
 
+// Get Stats
+router.get('/stats', requireModuleAccess('suppliers', 'view'), supplierController.getSupplierStats);
+
 // Get all Suppliers
 router.get('/', requireModuleAccess('suppliers', 'view'), supplierController.getSuppliers);
 

@@ -49,14 +49,16 @@ const createCustomer = async (req, res, next) => {
 
 const getCustomers = async (req, res, next) => {
     try {
-        const { page = 1, limit = 20, search, storeId: queryStoreId } = req.query;
+        const { page = 1, limit = 20, search, storeId: queryStoreId, startDate, endDate } = req.query;
         const storeId = queryStoreId || req.permissionContext?.storeId;
 
         const result = await customerService.getCustomers(req.tenantId, {
             page: parseInt(page),
             limit: parseInt(limit),
             search,
-            storeId
+            storeId,
+            startDate,
+            endDate
         });
 
         const totalPages = Math.ceil(result.total / result.limit);
@@ -115,6 +117,35 @@ const recordPayment = async (req, res, next) => {
         );
         return res.status(200).json(new ApiResponse(200, customer, 'Payment recorded successfully'));
     } catch (error) {
+        console.error("DEBUG MANUAL PAYMENT ERROR:", error);
+        res.status(500).json({ error: error.message, stack: error.stack });
+    }
+};
+
+const getCustomerStats = async (req, res, next) => {
+    try {
+        const prisma = require('../config/prisma');
+        const storeId = req.query.storeId || req.permissionContext?.storeId;
+        
+        const where = { tenantId: req.tenantId, deletedAt: null };
+        if (storeId) {
+            where.storeId = storeId;
+        }
+
+        const customers = await prisma.customer.findMany({
+            where,
+            select: { customerType: true, outstandingBalance: true }
+        });
+
+        const stats = {
+            total: customers.length,
+            retail: customers.filter(c => c.customerType === 'RETAIL').length,
+            wholesale: customers.filter(c => c.customerType === 'WHOLESALE').length,
+            totalBalance: customers.reduce((sum, c) => sum + (c.outstandingBalance || 0), 0)
+        };
+
+        return res.status(200).json(new ApiResponse(200, stats, 'Customer stats fetched successfully'));
+    } catch (error) {
         next(error);
     }
 };
@@ -125,5 +156,6 @@ module.exports = {
     getCustomerById,
     updateCustomer,
     deleteCustomer,
-    recordPayment
+    recordPayment,
+    getCustomerStats
 };

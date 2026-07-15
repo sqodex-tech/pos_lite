@@ -1,5 +1,6 @@
 const prisma = require('../config/prisma');
 const supplierRepository = require('../repositories/supplier.repository');
+const transactionService = require('./transaction.service');
 const ApiError = require('../utils/ApiError');
 
 class SupplierService {
@@ -40,6 +41,21 @@ class SupplierService {
             // Paying reduces what we owe them
             await supplierRepository.updateBalance(tenantId, supplierId, -amount, storeId, tx);
 
+            // 1.5 Update the dynamic PartyBalance ledger to keep dashboard perfectly synced
+            const existingParty = await tx.partyBalance.findFirst({
+                where: { tenantId, storeId, partyId: supplierId, partyType: 'SUPPLIER' }
+            });
+            if (existingParty) {
+                await tx.partyBalance.update({
+                    where: { id: existingParty.id },
+                    data: { currentBalance: { increment: -amount } }
+                });
+            } else {
+                await tx.partyBalance.create({
+                    data: { tenantId, storeId, partyId: supplierId, partyType: 'SUPPLIER', currentBalance: -amount }
+                });
+            }
+
             // 2. Add to Cash Ledger
             await tx.cashLedger.create({
                 data: {
@@ -54,9 +70,35 @@ class SupplierService {
                 }
             });
 
+            // 3. Create a Transaction row so it appears in the Supplier Statement
+            const txnNumber = await transactionService.generateTransactionNumber(tenantId, 'PAY');
+            
+            await tx.transaction.create({
+                data: {
+                    tenantId,
+                    storeId,
+                    userId,
+                    partyType: 'SUPPLIER',
+                    partyId: supplierId,
+                    transactionNumber: txnNumber,
+                    type: 'PAYMENT_SENT',
+                    subtotal: amount,
+                    total: amount,
+                    paymentMethod: paymentMethod || 'CASH',
+                    paymentDetails: { cash: amount },
+                    balanceTracking: {
+                        previousBalance: supplier.payableBalance,
+                        transactionImpact: -amount,
+                        currentBalance: supplier.payableBalance - amount
+                    },
+                    status: 'COMPLETED',
+                    notes: description
+                }
+            });
+
             // Return updated supplier info
             return await supplierRepository.findById(tenantId, supplierId, storeId);
-        });
+        }, { maxWait: 10000, timeout: 20000 });
     }
 }
 

@@ -1,10 +1,11 @@
 import api from '../axios';
 
 export interface Transaction {
-    _id: string;
+    id: string;
     transactionNumber: string;
     partyId?: string;
     partyType?: 'CUSTOMER' | 'SUPPLIER';
+    type?: string;
     items: Array<{
         itemId: string;
         itemName?: string;

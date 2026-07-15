@@ -40,9 +40,9 @@ export default function CategoryFormModal({
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     const parentOptions = categories
-        .filter(c => !c.parentId && c._id !== category?._id)
+        .filter(c => !c.parentId && c.id !== category?.id)
         .map(cat => ({
-            value: cat._id,
+            value: cat.id,
             label: cat.name,
             icon: cat.icon,
             color: cat.color,
@@ -87,7 +87,7 @@ export default function CategoryFormModal({
             const storeId = localStorage.getItem('storeId') || '';
 
             if (category) {
-                await categoriesApi.update(category._id, storeId, payload);
+                await categoriesApi.update(category.id, storeId, payload);
                 toast.success('Category updated successfully');
             } else {
                 await categoriesApi.create(storeId, payload);

@@ -27,12 +27,45 @@ class CustomerRepository {
             ];
         }
 
-        const customers = await prisma.customer.findMany({
+        let customers = await prisma.customer.findMany({
             where,
             skip: (pageNum - 1) * limitNum,
             take: limitNum,
             orderBy: { createdAt: 'desc' }
         });
+
+        if (options.startDate && options.endDate) {
+            const customerIds = customers.map(c => c.id);
+            if (customerIds.length > 0) {
+                const transactions = await prisma.transaction.findMany({
+                    where: {
+                        tenantId,
+                        storeId: storeId || undefined,
+                        partyType: 'CUSTOMER',
+                        partyId: { in: customerIds },
+                        date: {
+                            gte: new Date(options.startDate),
+                            lte: new Date(options.endDate)
+                        },
+                        deletedAt: null
+                    },
+                    select: { partyId: true, type: true, total: true }
+                });
+
+                const periodData = {};
+                transactions.forEach(t => {
+                    if (!periodData[t.partyId]) periodData[t.partyId] = { sales: 0, payments: 0 };
+                    if (t.type === 'SALE') periodData[t.partyId].sales += t.total;
+                    if (t.type === 'PAYMENT_RECEIVED') periodData[t.partyId].payments += t.total;
+                });
+
+                customers = customers.map(c => ({
+                    ...c,
+                    periodSales: periodData[c.id]?.sales || 0,
+                    periodPayments: periodData[c.id]?.payments || 0
+                }));
+            }
+        }
 
         const total = await prisma.customer.count({ where });
         return { customers, total, page: pageNum, limit: limitNum };

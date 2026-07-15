@@ -1,6 +1,6 @@
 const prisma = require('../config/prisma');
 const transactionRepository = require('../repositories/transaction.repository');
-const inventoryService = require('./inventory.service');
+const stockService = require('./stock.service');
 const ApiError = require('../utils/ApiError');
 
 class TransactionService {
@@ -37,11 +37,11 @@ class TransactionService {
             const { storeId, partyId, items, total, paymentMethod } = data;
             
             // 1. Get current balance
-            const currentBalance = await this.getPartyBalance(tenantId, storeId, partyId, 'CUSTOMER', tx);
+            const currentBalance = partyId ? await this.getPartyBalance(tenantId, storeId, partyId, 'CUSTOMER', tx) : 0;
             
             // 2. Calculate impact (Credit sale increases what customer owes us)
             let transactionImpact = (paymentMethod === 'CREDIT' || paymentMethod === 'MIXED') 
-                ? (data.paymentDetails?.credit || total) 
+                ? (data.paymentDetails?.credit ?? total) 
                 : 0;
             
             const newBalance = currentBalance + transactionImpact;
@@ -58,15 +58,15 @@ class TransactionService {
                 transactionNumber,
                 tenantId,
                 userId,
-                partyType: 'CUSTOMER',
-                balanceTracking: {
+                partyType: partyId ? 'CUSTOMER' : null,
+                balanceTracking: partyId ? {
                     previousBalance: currentBalance,
                     transactionImpact: transactionImpact,
                     currentBalance: newBalance,
                     formattedPrevious: this.formatBalanceWithSign(currentBalance, 'CUSTOMER'),
                     formattedImpact: this.formatBalanceWithSign(transactionImpact, 'CUSTOMER'),
                     formattedCurrent: this.formatBalanceWithSign(newBalance, 'CUSTOMER')
-                },
+                } : null,
                 items: {
                     create: items ? items.map(item => ({
                         itemId: item.itemId,
@@ -81,14 +81,20 @@ class TransactionService {
             
             // 5. Update Inventory (SUB)
             for (const item of items) {
-                await inventoryService.updateStock(tenantId, storeId, item.itemId, item.quantity, 'SUB', { tx });
+                await stockService.updateStock(tenantId, storeId, item.itemId, -item.quantity, 'OUT', userId, transaction.id, 'Sale', '', tx);
             }
             
             // 6. Update Party Balance
-            await this.updatePartyBalance({
-                tenantId, storeId, partyId, partyType: 'CUSTOMER',
-                impact: transactionImpact, type: 'PURCHASE', total
-            }, tx);
+            if (partyId) {
+                await this.updatePartyBalance({
+                    tenantId, storeId, partyId, partyType: 'CUSTOMER',
+                    impact: transactionImpact, type: 'PURCHASE', total
+                }, tx);
+                
+                // Keep the legacy customer model perfectly synced
+                const customerRepository = require('../repositories/customer.repository');
+                await customerRepository.updateBalance(tenantId, partyId, transactionImpact, storeId, tx);
+            }
             
             // 7. Cash Ledger entry if paid
             if (['CASH', 'CARD', 'BANK_TRANSFER', 'MIXED'].includes(paymentMethod)) {
@@ -106,18 +112,18 @@ class TransactionService {
             }
             
             return transaction;
-        });
+        }, { maxWait: 10000, timeout: 20000 });
     }
 
     async createPurchase(data, tenantId, userId) {
         return await prisma.$transaction(async (tx) => {
             const { storeId, partyId, items, total, paymentMethod } = data;
             
-            const currentBalance = await this.getPartyBalance(tenantId, storeId, partyId, 'SUPPLIER', tx);
+            const currentBalance = partyId ? await this.getPartyBalance(tenantId, storeId, partyId, 'SUPPLIER', tx) : 0;
             
-            // Impact is negative (we owe supplier more)
+            // Impact is positive (we owe supplier more)
             let transactionImpact = (paymentMethod === 'CREDIT' || paymentMethod === 'MIXED') 
-                ? -(data.paymentDetails?.credit || total) 
+                ? (data.paymentDetails?.credit ?? total) 
                 : 0;
             
             const newBalance = currentBalance + transactionImpact;
@@ -131,15 +137,15 @@ class TransactionService {
                 transactionNumber,
                 tenantId,
                 userId,
-                partyType: 'SUPPLIER',
-                balanceTracking: {
+                partyType: partyId ? 'SUPPLIER' : null,
+                balanceTracking: partyId ? {
                     previousBalance: currentBalance,
                     transactionImpact,
                     currentBalance: newBalance,
                     formattedPrevious: this.formatBalanceWithSign(currentBalance, 'SUPPLIER'),
                     formattedImpact: this.formatBalanceWithSign(transactionImpact, 'SUPPLIER'),
                     formattedCurrent: this.formatBalanceWithSign(newBalance, 'SUPPLIER')
-                },
+                } : null,
                 items: {
                     create: items ? items.map(item => ({
                         itemId: item.itemId,
@@ -153,16 +159,22 @@ class TransactionService {
             }, tx);
             
             for (const item of items) {
-                await inventoryService.updateStock(tenantId, storeId, item.itemId, item.quantity, 'ADD', { tx });
+                await stockService.updateStock(tenantId, storeId, item.itemId, item.quantity, 'IN', userId, transaction.id, 'Purchase', '', tx);
             }
             
-            await this.updatePartyBalance({
-                tenantId, storeId, partyId, partyType: 'SUPPLIER',
-                impact: transactionImpact, type: 'PURCHASE', total
-            }, tx);
+            if (partyId) {
+                await this.updatePartyBalance({
+                    tenantId, storeId, partyId, partyType: 'SUPPLIER',
+                    impact: transactionImpact, type: 'PURCHASE', total
+                }, tx);
+
+                // Keep the legacy supplier model perfectly synced
+                const supplierRepository = require('../repositories/supplier.repository');
+                await supplierRepository.updateBalance(tenantId, partyId, transactionImpact, storeId, tx);
+            }
             
             return transaction;
-        });
+        }, { maxWait: 10000, timeout: 20000 });
     }
 
     async recordPayment(data, tenantId, userId) {
@@ -171,9 +183,8 @@ class TransactionService {
             
             const currentBalance = await this.getPartyBalance(tenantId, storeId, partyId, partyType, tx);
             
-            // If CUSTOMER pays us: Impact is negative (decreases what they owe us)
-            // If we pay SUPPLIER: Impact is positive (decreases what we owe them)
-            let transactionImpact = partyType === 'CUSTOMER' ? -total : total;
+            // For both Customer and Supplier: Paying decreases what is owed (balance goes down)
+            let transactionImpact = -total;
             const newBalance = currentBalance + transactionImpact;
             
             const transactionNumber = await this.generateTransactionNumber(tenantId, 'PAYMENT');
@@ -206,7 +217,7 @@ class TransactionService {
             }, tx);
             
             return transaction;
-        });
+        }, { maxWait: 10000, timeout: 20000 });
     }
 
     // Helper Methods
@@ -217,10 +228,20 @@ class TransactionService {
         });
         
         if (!balanceDoc) {
-            balanceDoc = await client.partyBalance.create({ 
-                data: { tenantId, storeId, partyId, partyType } 
-            });
-            return 0;
+            try {
+                balanceDoc = await client.partyBalance.create({ 
+                    data: { tenantId, storeId, partyId, partyType } 
+                });
+            } catch (err) {
+                if (err.code === 'P2002') {
+                    balanceDoc = await client.partyBalance.findFirst({ 
+                        where: { tenantId, storeId, partyId, partyType } 
+                    });
+                } else {
+                    throw err;
+                }
+            }
+            return balanceDoc ? balanceDoc.currentBalance || 0 : 0;
         }
         return balanceDoc.currentBalance || 0;
     }
@@ -234,9 +255,19 @@ class TransactionService {
         });
 
         if (!existing) {
-            existing = await client.partyBalance.create({
-                data: { tenantId, storeId, partyId, partyType }
-            });
+            try {
+                existing = await client.partyBalance.create({
+                    data: { tenantId, storeId, partyId, partyType }
+                });
+            } catch (err) {
+                if (err.code === 'P2002') {
+                    existing = await client.partyBalance.findFirst({
+                        where: { tenantId, storeId, partyId, partyType }
+                    });
+                } else {
+                    throw err;
+                }
+            }
         }
 
         const breakdown = existing.balanceBreakdown || {};
@@ -264,10 +295,26 @@ class TransactionService {
     }
 
     async generateTransactionNumber(tenantId, prefix) {
-        const count = await prisma.transaction.count({ 
-            where: { tenantId, type: { startsWith: prefix } } 
+        const lastTransaction = await prisma.transaction.findFirst({
+            where: { tenantId, transactionNumber: { startsWith: prefix } },
+            orderBy: { transactionNumber: 'desc' }
         });
-        return `${prefix}-${Date.now()}-${count + 1}`;
+
+        if (!lastTransaction) {
+            return `${prefix}-0000`;
+        }
+
+        const match = lastTransaction.transactionNumber.match(/-(\d+)$/);
+        if (match) {
+            const nextNumber = parseInt(match[1], 10) + 1;
+            return `${prefix}-${String(nextNumber).padStart(4, '0')}`;
+        }
+
+        // Fallback
+        const count = await prisma.transaction.count({ 
+            where: { tenantId, transactionNumber: { startsWith: prefix } } 
+        });
+        return `${prefix}-${String(count).padStart(4, '0')}`;
     }
 
     formatBalanceWithSign(balance, partyType) {
@@ -275,7 +322,7 @@ class TransactionService {
         if (partyType === 'CUSTOMER') {
             return balance >= 0 ? `+$${absValue} (Owes)` : `-$${absValue} (Credit)`;
         } else {
-            return balance <= 0 ? `-$${absValue} (Payable)` : `+$${absValue} (Prepaid)`;
+            return balance >= 0 ? `+$${absValue} (Payable)` : `-$${absValue} (Prepaid)`;
         }
     }
 
@@ -330,35 +377,60 @@ class TransactionService {
 
         const transactions = await prisma.transaction.findMany({
             where: query,
+            include: { items: true },
             orderBy: { date: 'asc' }
         });
         
         // Calculate opening balance
         let runningBalance = transactions.length > 0 ? (transactions[0].balanceTracking?.previousBalance || 0) : 0;
         
+        let totalPurchases = 0;
+        let totalPayments = 0;
+        
         const statement = transactions.map(transaction => {
             const impact = transaction.balanceTracking?.transactionImpact || 0;
             const prev = runningBalance;
             runningBalance += impact;
+            
+            if (transaction.type === 'SALE' || transaction.type === 'PURCHASE') {
+                totalPurchases += transaction.total;
+                totalPayments += (transaction.total - impact);
+            } else if (transaction.type === 'PAYMENT_RECEIVED' || transaction.type === 'PAYMENT_SENT') {
+                totalPayments += transaction.total;
+            }
             
             return {
                 date: transaction.date,
                 transactionNumber: transaction.transactionNumber,
                 type: transaction.type,
                 total: transaction.total,
+                paymentMethod: transaction.paymentMethod,
+                paymentDetails: transaction.paymentDetails,
+                items: transaction.items,
                 impact: impact,
                 balance: runningBalance,
                 formattedBalance: this.formatBalanceWithSign(runningBalance, partyType)
             };
         });
         
+        const partyBalance = await prisma.partyBalance.findFirst({
+            where: { tenantId, storeId, partyId, partyType }
+        });
+        
+        // Self-heal the balance mathematically to resolve data desync bugs
+        const openingBalance = transactions.length > 0 ? (transactions[0].balanceTracking?.previousBalance || 0) : 0;
+        const mathematicalBalance = openingBalance + totalPurchases - totalPayments;
+
         return {
             partyId,
             partyType,
             startDate,
             endDate,
-            openingBalance: transactions.length > 0 ? transactions[0].balanceTracking?.previousBalance : 0,
+            openingBalance,
             closingBalance: runningBalance,
+            currentBalance: mathematicalBalance,
+            totalPurchases,
+            totalPayments,
             transactions: statement
         };
     }
@@ -375,7 +447,7 @@ class TransactionService {
         const suppliers = balances.filter(b => b.partyType === 'SUPPLIER');
 
         const totalReceivables = customers.reduce((sum, c) => sum + (c.currentBalance > 0 ? c.currentBalance : 0), 0);
-        const totalPayables = suppliers.reduce((sum, s) => sum + (s.currentBalance < 0 ? Math.abs(s.currentBalance) : 0), 0);
+        const totalPayables = suppliers.reduce((sum, s) => sum + (s.currentBalance > 0 ? s.currentBalance : 0), 0);
 
         return {
             receivables: {

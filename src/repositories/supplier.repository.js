@@ -27,12 +27,45 @@ class SupplierRepository {
             ];
         }
 
-        const suppliers = await prisma.supplier.findMany({
+        let suppliers = await prisma.supplier.findMany({
             where,
             skip: (pageNum - 1) * limitNum,
             take: limitNum,
             orderBy: { createdAt: 'desc' }
         });
+
+        if (options.startDate && options.endDate) {
+            const supplierIds = suppliers.map(s => s.id);
+            if (supplierIds.length > 0) {
+                const transactions = await prisma.transaction.findMany({
+                    where: {
+                        tenantId,
+                        storeId: storeId || undefined,
+                        partyType: 'SUPPLIER',
+                        partyId: { in: supplierIds },
+                        date: {
+                            gte: new Date(options.startDate),
+                            lte: new Date(options.endDate)
+                        },
+                        deletedAt: null
+                    },
+                    select: { partyId: true, type: true, total: true }
+                });
+
+                const periodData = {};
+                transactions.forEach(t => {
+                    if (!periodData[t.partyId]) periodData[t.partyId] = { purchases: 0, payments: 0 };
+                    if (t.type === 'PURCHASE') periodData[t.partyId].purchases += t.total;
+                    if (t.type === 'PAYMENT_MADE') periodData[t.partyId].payments += t.total;
+                });
+
+                suppliers = suppliers.map(s => ({
+                    ...s,
+                    periodPurchases: periodData[s.id]?.purchases || 0,
+                    periodPayments: periodData[s.id]?.payments || 0
+                }));
+            }
+        }
 
         const total = await prisma.supplier.count({ where });
         return { suppliers, total, page: pageNum, limit: limitNum };

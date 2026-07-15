@@ -16,6 +16,12 @@ class TransactionRepository {
         const where = { tenantId, deletedAt: null };
         if (storeId) where.storeId = storeId;
         if (type) where.type = type;
+        if (options.startDate && options.endDate) {
+            where.date = {
+                gte: new Date(options.startDate),
+                lte: new Date(options.endDate)
+            };
+        }
 
         const transactions = await prisma.transaction.findMany({
             where,
