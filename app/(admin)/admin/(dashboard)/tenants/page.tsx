@@ -9,15 +9,16 @@ import {
   useReactTable,
   ColumnDef,
 } from '@tanstack/react-table';
-import { Search, Building2, ArrowUpDown, CreditCard, CheckCircle2, AlertCircle, RefreshCw, FileText } from 'lucide-react';
+import { Search, Building2, ArrowUpDown, CreditCard, CheckCircle2, AlertCircle, RefreshCw, FileText, Ghost } from 'lucide-react';
 import SubscriptionModal from '@/components/admin/SubscriptionModal';
 import InvoiceModal from '@/components/admin/InvoiceModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tenant } from '@/types';
 import toast from 'react-hot-toast';
 
+
 export default function TenantsPage() {
-  const { tenants, loading, error, updateTenantStatus, fetchTenants, createBillingRecord } = useTenants();
+  const { tenants, loading, error, updateTenantStatus, fetchTenants, createBillingRecord, impersonateTenant } = useTenants();
   const [sorting, setSorting] = useState<any>([]);
   const [globalFilter, setGlobalFilter] = useState('');
   
@@ -32,6 +33,19 @@ export default function TenantsPage() {
       toast.success(`Tenant ${newStatus === 'active' ? 'resumed' : 'suspended'}`);
     } else {
       toast.error(res.message);
+    }
+  };
+
+  const handleImpersonate = async (tenantId: string) => {
+    const toastId = toast.loading('Initiating Magic Login...');
+    const res = await impersonateTenant(tenantId);
+    if (res.success) {
+      toast.success('Impersonation token generated', { id: toastId });
+      // Redirect to shopkeeper dashboard with magic token
+      const magicUrl = `${window.location.origin}/login?magicToken=${res.token}`;
+      window.open(magicUrl, '_blank');
+    } else {
+      toast.error(res.message, { id: toastId });
     }
   };
 
@@ -61,7 +75,7 @@ export default function TenantsPage() {
       accessorKey: 'name',
       header: ({ column }) => (
         <button
-          className="flex items-center gap-2 hover:text-indigo-600 transition-colors font-bold uppercase tracking-wider text-[10px]"
+          className="flex items-center gap-2 hover:text-indigo-600 transition-colors font-semibold text-xs text-slate-500 uppercase tracking-wider"
           onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
         >
           Entity Name
@@ -75,7 +89,7 @@ export default function TenantsPage() {
           </div>
           <div className="flex flex-col">
             <span className="font-bold text-slate-800 dark:text-slate-200">{row.original.name}</span>
-            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">{row.original.email}</span>
+            <span className="text-xs font-medium text-slate-500">{row.original.email}</span>
           </div>
         </div>
       )
@@ -83,7 +97,7 @@ export default function TenantsPage() {
     {
       accessorKey: 'planId.name',
       id: 'plan',
-      header: () => <span className="font-bold uppercase tracking-wider text-[10px]">Current Plan</span>,
+      header: () => <span className="font-semibold text-xs text-slate-500 uppercase tracking-wider">Current Plan</span>,
       cell: ({ row }) => {
         const planName = (row.original as any).planId?.name;
         return (
@@ -98,11 +112,11 @@ export default function TenantsPage() {
     },
     {
       accessorKey: 'status',
-      header: () => <span className="font-bold uppercase tracking-wider text-[10px]">State</span>,
+      header: () => <span className="font-semibold text-xs text-slate-500 uppercase tracking-wider">Status</span>,
       cell: ({ row }) => {
         const isActive = row.original.status === 'active';
         return (
-          <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest ${
+          <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold ${
             isActive 
               ? 'bg-emerald-50 text-emerald-700 border border-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-900/30 dark:text-emerald-400' 
               : 'bg-rose-50 text-rose-700 border border-rose-100 dark:bg-rose-900/20 dark:border-rose-900/30 dark:text-rose-400'
@@ -115,21 +129,30 @@ export default function TenantsPage() {
     },
     {
       accessorKey: 'createdAt',
-      header: () => <span className="font-bold uppercase tracking-wider text-[10px]">Member Since</span>,
+      header: () => <span className="font-semibold text-xs text-slate-500 uppercase tracking-wider">Member Since</span>,
       cell: ({ row }) => (
-        <span className="text-slate-400 dark:text-slate-500 text-xs font-bold">
+        <span className="text-slate-500 dark:text-slate-400 text-sm font-medium">
           {new Date(row.original.createdAt || Date.now()).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
         </span>
       )
     },
     {
       id: 'actions',
-      header: () => <span className="font-bold uppercase tracking-wider text-[10px] text-right block">Management</span>,
+      header: () => <span className="font-semibold text-xs text-slate-500 uppercase tracking-wider text-right block">Actions</span>,
       cell: ({ row }) => {
         const tenant = row.original;
         const isActive = tenant.status === 'active';
         return (
           <div className="flex items-center justify-end gap-2 text-right">
+            <motion.button 
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => handleImpersonate(tenant.id || tenant._id)}
+              className="p-2 text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 rounded-xl transition-all"
+              title="Magic Login (Impersonate)"
+            >
+              <Ghost className="w-4.5 h-4.5" />
+            </motion.button>
             <motion.button 
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -189,8 +212,8 @@ export default function TenantsPage() {
     >
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6">
         <div>
-          <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Tenants Table <span className="text-indigo-600">.v1</span></h2>
-          <p className="text-slate-500 dark:text-slate-400 mt-1 font-medium">Control platform access and subscription health.</p>
+          <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Tenants</h2>
+          <p className="text-slate-500 dark:text-slate-400 mt-1 font-medium">Control platform access and subscriptions.</p>
         </div>
         <div className="flex gap-3">
           <motion.button 
@@ -206,7 +229,7 @@ export default function TenantsPage() {
             whileTap={{ scale: 0.98 }}
             className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl text-sm font-bold transition-all shadow-lg shadow-indigo-600/20 active:scale-95"
           >
-            Deploy New Tenant
+            Add New Tenant
           </motion.button>
         </div>
       </div>
@@ -223,7 +246,7 @@ export default function TenantsPage() {
               className="w-full pl-11 pr-4 py-3 bg-white dark:bg-slate-800 border-none rounded-2xl text-sm font-medium dark:text-white shadow-inner focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
             />
           </div>
-          <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+          <div className="text-xs font-semibold text-slate-400">
             Total Entities: {filteredRows.length}
           </div>
         </div>

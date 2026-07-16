@@ -30,6 +30,7 @@ router.get('/:id', tenantController.getTenantById);
 router.patch('/:id', validate(updateTenantSchema), tenantController.updateTenant);
 router.patch('/:id/status', validate(updateStatusSchema), tenantController.updateTenantStatus);
 router.delete('/:id', tenantController.deleteTenant);
+router.post('/:id/impersonate', tenantController.impersonateTenant);
 
 // ── Billing CRUD ──
 router.get('/:id/billing-history', tenantController.getBillingHistory);

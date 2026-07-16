@@ -87,3 +87,41 @@ body {
 .dark ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.25);
 }
+
+/* POS Thermal Printer Styles */
+@media print {
+  /* Hide standard UI elements */
+  nav, header, aside, .sidebar-layout, [data-sidebar], .no-print {
+    display: none !important;
+  }
+
+  @page {
+    margin: 0;
+    size: 80mm auto;
+  }
+
+  body {
+    margin: 0;
+    padding: 2mm;
+    background: white !important;
+    color: black !important;
+    font-size: 12px;
+    width: 80mm;
+    line-height: 1.2;
+  }
+
+  /* Force elements to be print friendly */
+  * {
+    color: black !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    border-color: #000 !important;
+  }
+
+  /* Specific POS Layout Resets */
+  main, .pos-container, .h-screen, .h-\[calc\(100vh-120px\)\] {
+    height: auto !important;
+    overflow: visible !important;
+  }
+}

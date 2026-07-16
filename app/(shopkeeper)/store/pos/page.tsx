@@ -46,6 +46,7 @@ export default function POSPage() {
     const [showCameraScanner, setShowCameraScanner] = useState(false);
     const [isFetching, setIsFetching] = useState(true);
     const [isCheckingOut, setIsCheckingOut] = useState(false);
+    const searchInputRef = React.useRef<HTMLInputElement>(null);
 
     React.useEffect(() => {
         if (!showCameraScanner) return;
@@ -168,6 +169,22 @@ export default function POSPage() {
 
     React.useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'F2') {
+                e.preventDefault();
+                searchInputRef.current?.focus();
+                return;
+            }
+            if (e.key === 'F4') {
+                e.preventDefault();
+                setCart([]);
+                return;
+            }
+            if (e.key === 'F8') {
+                e.preventDefault();
+                document.getElementById('checkout-btn')?.click();
+                return;
+            }
+
             // Ignore if typing in an input
             if (
                 e.target instanceof HTMLInputElement ||
@@ -348,13 +365,14 @@ export default function POSPage() {
     return (
         <div className="h-[calc(100vh-120px)] flex gap-8 overflow-hidden">
             {/* Products Section */}
-            <div className="flex-1 flex flex-col gap-6">
+            <div className="flex-1 flex flex-col gap-6 no-print">
                 <div className="flex items-center justify-between">
                     <div className="relative w-96">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                         <input
+                            ref={searchInputRef}
                             type="text"
-                            placeholder="Search product or scan barcode..."
+                            placeholder="Search product or scan barcode... (F2)"
                             className="w-full pl-12 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
@@ -430,9 +448,14 @@ export default function POSPage() {
                             <ShoppingCart className="w-6 h-6 text-primary" />
                             <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200">New Order</h3>
                         </div>
-                        <span className="bg-slate-50 dark:bg-slate-800 text-slate-500 px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase">
-                            #{draftOrderId}
-                        </span>
+                        <div className="flex items-center gap-2">
+                            {cart.length > 0 && (
+                                <button onClick={() => setCart([])} className="text-[10px] text-slate-400 hover:text-rose-500 font-bold px-2 py-1 bg-slate-100 dark:bg-slate-800 dark:hover:bg-rose-950/30 rounded transition-colors" title="Clear Cart (F4)">Clear (F4)</button>
+                            )}
+                            <span className="bg-slate-50 dark:bg-slate-800 text-slate-500 px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase">
+                                #{draftOrderId}
+                            </span>
+                        </div>
                     </div>
 
                     <div className="flex gap-2 mb-4">
@@ -645,11 +668,12 @@ export default function POSPage() {
 
                     {/* Action Button */}
                     <Button 
+                        id="checkout-btn"
                         className={`w-full py-2.5 text-xs font-black rounded-lg shadow-md shadow-primary/20 transition-transform active:scale-[0.98] ${isCheckingOut ? 'opacity-70 cursor-not-allowed' : ''}`} 
                         onClick={handleCheckout}
                         disabled={isCheckingOut}
                     >
-                        {isCheckingOut ? 'Processing...' : 'Checkout'}
+                        {isCheckingOut ? 'Processing...' : 'Checkout (F8)'}
                     </Button>
                 </div>
             </div>

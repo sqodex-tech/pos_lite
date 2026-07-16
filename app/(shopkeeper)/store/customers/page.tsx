@@ -13,7 +13,8 @@ import {
     UserCheck,
     TrendingUp,
     Receipt,
-    X
+    X,
+    MessageCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -235,6 +236,18 @@ export default function CustomersPage() {
                                 {canManage && (
                                     <td className="py-4 px-4 text-right" onClick={(e) => e.stopPropagation()}>
                                         <div className="flex gap-2 justify-end">
+                                            {(customer.outstandingBalance || 0) > 0 && customer.phone && (
+                                                <button
+                                                    onClick={() => {
+                                                        const msg = `Hello ${customer.name}, your current outstanding balance at our store is Rs ${Math.abs(customer.outstandingBalance || 0).toFixed(2)}. Please arrange payment at your earliest convenience.`;
+                                                        window.open(`https://wa.me/${customer.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
+                                                    }}
+                                                    className="p-2 hover:bg-emerald-50 rounded-lg"
+                                                    title="Send WhatsApp Reminder"
+                                                >
+                                                    <MessageCircle className="w-4 h-4 text-emerald-500" />
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => { setSelectedCustomer(customer); setShowModal(true); }}
                                                 className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"

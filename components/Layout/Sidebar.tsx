@@ -39,136 +39,155 @@ interface MenuItem {
     href: string;
     permissions: string[];
     roles?: string[];
+    group: string;
 }
 
-// Unified Menu items for Tenant
 const menuItems: MenuItem[] = [
     {
         icon: LayoutDashboard,
         label: 'Dashboard',
         href: '/store',
-        permissions: [] // Dashboard visible to all store users
-    },
-    {
-        icon: Store,
-        label: 'Stores',
-        href: '/store/stores',
-        permissions: [PERMISSIONS.VIEW_STORES, PERMISSIONS.MANAGE_STORES],
-        roles: ['ADMIN'] // Only ADMIN can manage stores
+        permissions: [],
+        group: 'Core'
     },
     {
         icon: ShoppingCart,
         label: 'POS Checkout',
         href: '/store/pos',
         permissions: [PERMISSIONS.CREATE_TRANSACTION],
-        roles: ['ADMIN', 'STORE_MANAGER', 'SALES'] // ADMIN can also use POS
+        roles: ['ADMIN', 'STORE_MANAGER', 'SALES'],
+        group: 'Core'
+    },
+    {
+        icon: Store,
+        label: 'Stores',
+        href: '/store/stores',
+        permissions: [PERMISSIONS.VIEW_STORES, PERMISSIONS.MANAGE_STORES],
+        roles: ['ADMIN'],
+        group: 'Administration'
     },
     {
         icon: Package,
         label: 'Inventory',
         href: '/store/inventory',
         permissions: [PERMISSIONS.VIEW_INVENTORY, PERMISSIONS.MANAGE_INVENTORY],
-        roles: ['ADMIN', 'STORE_MANAGER', 'SALES', 'ACCOUNTANT'] // All can view
+        roles: ['ADMIN', 'STORE_MANAGER', 'SALES', 'ACCOUNTANT'],
+        group: 'Inventory'
     },
     {
         icon: FolderTree,
         label: 'Categories',
         href: '/store/categories',
         permissions: [PERMISSIONS.VIEW_INVENTORY, PERMISSIONS.MANAGE_INVENTORY],
-        roles: ['ADMIN', 'STORE_MANAGER'] // ADMIN and Manager can manage categories
+        roles: ['ADMIN', 'STORE_MANAGER'],
+        group: 'Inventory'
     },
     {
         icon: Tag,
         label: 'Brands',
         href: '/store/brands',
         permissions: [PERMISSIONS.VIEW_INVENTORY, PERMISSIONS.MANAGE_INVENTORY],
-        roles: ['ADMIN', 'STORE_MANAGER'] // ADMIN and Manager can manage brands
+        roles: ['ADMIN', 'STORE_MANAGER'],
+        group: 'Inventory'
     },
     {
         icon: Ruler,
         label: 'Units',
         href: '/store/units',
         permissions: [PERMISSIONS.VIEW_INVENTORY, PERMISSIONS.MANAGE_INVENTORY],
-        roles: ['ADMIN', 'STORE_MANAGER'] // ADMIN and Manager can manage units
+        roles: ['ADMIN', 'STORE_MANAGER'],
+        group: 'Inventory'
     },
     {
         icon: UserCheck,
         label: 'Customers',
         href: '/store/customers',
         permissions: [PERMISSIONS.VIEW_CUSTOMERS, PERMISSIONS.MANAGE_CUSTOMERS],
-        roles: ['ADMIN', 'STORE_MANAGER', 'SALES', 'ACCOUNTANT'] // All can view
+        roles: ['ADMIN', 'STORE_MANAGER', 'SALES', 'ACCOUNTANT'],
+        group: 'Parties'
     },
     {
         icon: Truck,
         label: 'Suppliers',
         href: '/store/suppliers',
         permissions: [PERMISSIONS.VIEW_SUPPLIERS, PERMISSIONS.MANAGE_SUPPLIERS],
-        roles: ['ADMIN', 'STORE_MANAGER', 'ACCOUNTANT'] // ADMIN, Manager, Accountant
+        roles: ['ADMIN', 'STORE_MANAGER', 'ACCOUNTANT'],
+        group: 'Parties'
     },
     {
         icon: Receipt,
         label: 'Transactions',
         href: '/store/transactions',
         permissions: [PERMISSIONS.VIEW_TRANSACTIONS],
-        roles: ['ADMIN', 'STORE_MANAGER', 'SALES', 'ACCOUNTANT'] // All can view
+        roles: ['ADMIN', 'STORE_MANAGER', 'SALES', 'ACCOUNTANT'],
+        group: 'Finance'
     },
     {
         icon: Wallet,
         label: 'Store Expenses',
         href: '/store/expenses',
         permissions: [PERMISSIONS.VIEW_EXPENSES, PERMISSIONS.CREATE_EXPENSE],
-        roles: ['ADMIN', 'STORE_MANAGER', 'ACCOUNTANT'] // ADMIN, Manager, Accountant
+        roles: ['ADMIN', 'STORE_MANAGER', 'ACCOUNTANT'],
+        group: 'Finance'
     },
     {
         icon: BarChart3,
         label: 'Reports',
         href: '/store/reports',
         permissions: [PERMISSIONS.VIEW_REPORTS],
-        roles: ['ADMIN', 'STORE_MANAGER', 'SALES', 'ACCOUNTANT'] // All can view
+        roles: ['ADMIN', 'STORE_MANAGER', 'SALES', 'ACCOUNTANT'],
+        group: 'Finance'
     },
     {
         icon: Settings,
         label: 'Store Settings',
         href: '/store/settings',
         permissions: [PERMISSIONS.VIEW_SETTINGS, PERMISSIONS.MANAGE_SETTINGS],
-        roles: ['ADMIN', 'STORE_MANAGER'] // ADMIN and Manager can manage settings
+        roles: ['ADMIN', 'STORE_MANAGER'],
+        group: 'Administration'
     },
     {
         icon: ClipboardCheck,
         label: 'Approvals',
         href: '/store/approvals',
         permissions: [PERMISSIONS.MANAGE_SUBSCRIPTIONS],
-        roles: ['SUPER_ADMIN']
+        roles: ['SUPER_ADMIN'],
+        group: 'Administration'
     },
     {
         icon: Coins,
         label: 'Plan Management',
         href: '/store/plans/manage',
         permissions: [PERMISSIONS.MANAGE_PLANS],
-        roles: ['SUPER_ADMIN']
+        roles: ['SUPER_ADMIN'],
+        group: 'Administration'
     },
     {
         icon: Store,
         label: 'All Stores',
         href: '/store/stores-admin',
         permissions: [],
-        roles: ['SUPER_ADMIN']
+        roles: ['SUPER_ADMIN'],
+        group: 'Administration'
     },
     {
         icon: Receipt,
         label: 'Billing History',
         href: '/store/billing',
         permissions: [],
-        roles: ['ADMIN']
+        roles: ['ADMIN'],
+        group: 'Administration'
     },
     {
         icon: Headphones,
         label: 'Support',
         href: '/support',
         permissions: [],
-        roles: ['SUPER_ADMIN', 'ADMIN', 'STORE_MANAGER', 'SALES', 'ACCOUNTANT']
-    },
+        roles: ['SUPER_ADMIN', 'ADMIN', 'STORE_MANAGER', 'SALES', 'ACCOUNTANT'],
+        group: 'Administration'
+    }
 ];
+// Replaced above
 
 export function Sidebar() {
     const [isCollapsed, setIsCollapsed] = useState(false);
@@ -262,44 +281,65 @@ export function Sidebar() {
                 </div>
             )}
 
-            {/* Navigation */}
-            <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto overflow-x-hidden">
-                {visibleMenuItems.map((item) => {
-                    const isActive = pathname === item.href;
+            {/* Menu Items */}
+            <div className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-3 space-y-6">
+                {['Core', 'Inventory', 'Parties', 'Finance', 'Administration'].map((group) => {
+                    const groupItems = visibleMenuItems.filter(item => item.group === group);
+                    if (groupItems.length === 0) return null;
+
                     return (
-                        <Link
-                            key={item.href}
-                            href={item.href}
-                            className={cn(
-                                "flex items-center gap-4 px-4 py-3 rounded-2xl transition-all group relative",
-                                isActive
-                                    ? "bg-primary/10 text-primary dark:bg-primary/20"
-                                    : "hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                            )}
-                        >
-                            <item.icon className={cn(
-                                "w-6 h-6 shrink-0 transition-transform group-hover:scale-110",
-                                isActive ? "text-primary" : ""
-                            )} />
+                        <div key={group} className="space-y-1">
                             {!isCollapsed && (
-                                <motion.span
-                                    initial={{ opacity: 0, x: -10 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    className="font-medium"
-                                >
-                                    {item.label}
-                                </motion.span>
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 px-3">
+                                    {group}
+                                </h4>
                             )}
-                            {isActive && (
-                                <motion.div
-                                    layoutId="active-pill"
-                                    className="absolute left-0 w-1 h-6 bg-primary rounded-r-full"
-                                />
-                            )}
-                        </Link>
+                            {groupItems.map((item) => {
+                                const isActive = pathname === item.href;
+                                return (
+                                    <Link key={item.href} href={item.href}>
+                                        <motion.div
+                                            whileHover={{ x: 4 }}
+                                            whileTap={{ scale: 0.98 }}
+                                            className={cn(
+                                                "relative flex items-center p-3 my-1 rounded-xl cursor-pointer group transition-all duration-200",
+                                                isActive
+                                                    ? "bg-primary/10 text-primary font-bold shadow-sm"
+                                                    : "hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 font-medium"
+                                            )}
+                                        >
+                                            {isActive && (
+                                                <motion.div
+                                                    layoutId="sidebar-active"
+                                                    className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-full"
+                                                />
+                                            )}
+                                            <div className="flex items-center min-w-[24px]">
+                                                <item.icon className={cn(
+                                                    "w-5 h-5 transition-transform duration-200 group-hover:scale-110",
+                                                    isActive ? "text-primary" : ""
+                                                )} />
+                                            </div>
+
+                                            {!isCollapsed && (
+                                                <span className="ml-3 truncate font-semibold">
+                                                    {item.label}
+                                                </span>
+                                            )}
+                                            
+                                            {isCollapsed && (
+                                                <div className="absolute left-14 bg-slate-900 text-white text-xs px-2 py-1 rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 shadow-lg font-medium">
+                                                    {item.label}
+                                                </div>
+                                            )}
+                                        </motion.div>
+                                    </Link>
+                                );
+                            })}
+                        </div>
                     );
                 })}
-            </nav>
+            </div>
 
             {/* Collapse Toggle */}
             <button

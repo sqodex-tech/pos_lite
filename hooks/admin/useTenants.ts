@@ -41,9 +41,18 @@ export function useTenants() {
     }
   };
 
+  const impersonateTenant = async (tenantId: string) => {
+    try {
+      const response = await api.post(`/tenants/${tenantId}/impersonate`);
+      return { success: true, token: response.data.data.token };
+    } catch (err: any) {
+      return { success: false, message: err.response?.data?.message || 'Impersonation failed' };
+    }
+  };
+
   useEffect(() => {
     fetchTenants();
   }, [fetchTenants]);
 
-  return { tenants, loading, error, fetchTenants, updateTenantStatus, createBillingRecord };
+  return { tenants, loading, error, fetchTenants, updateTenantStatus, createBillingRecord, impersonateTenant };
 }

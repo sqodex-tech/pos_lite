@@ -40,11 +40,11 @@ export default function TransactionsPage() {
             }
             
             const params: any = {};
-            if (dateFilter !== 'all') {
-                const end = new Date();
-                const start = new Date();
-                start.setHours(0, 0, 0, 0);
+            const end = new Date();
+            const start = new Date();
+            start.setHours(0, 0, 0, 0);
 
+            if (dateFilter !== 'all') {
                 if (dateFilter === '7days') start.setDate(start.getDate() - 7);
                 else if (dateFilter === '15days') start.setDate(start.getDate() - 15);
                 else if (dateFilter === '1month') start.setMonth(start.getMonth() - 1);
@@ -61,6 +61,11 @@ export default function TransactionsPage() {
                     params.startDate = start.toISOString();
                     params.endDate = end.toISOString();
                 }
+            } else {
+                // For 'all', we still need to provide dates to the reports API
+                const allStart = new Date(2000, 0, 1);
+                params.startDate = allStart.toISOString();
+                params.endDate = end.toISOString();
             }
             
             params.page = page;
@@ -68,7 +73,11 @@ export default function TransactionsPage() {
             
             const [response, statsRes] = await Promise.all([
                 transactionsApi.getAll(storeId, params),
-                reportsApi.getProfitLoss({ storeId, startDate: params.startDate, endDate: params.endDate })
+                reportsApi.getProfitLoss({ 
+                    storeId, 
+                    startDate: params.startDate || new Date(2000, 0, 1).toISOString(), 
+                    endDate: params.endDate || new Date().toISOString() 
+                })
             ]);
             
             const txnData = Array.isArray(response.data.data) ? response.data.data : [];

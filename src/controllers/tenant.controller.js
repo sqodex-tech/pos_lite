@@ -501,3 +501,30 @@ exports.deleteStoreForTenant = async (req, res, next) => {
         next(error);
     }
 };
+
+exports.impersonateTenant = async (req, res, next) => {
+    try {
+        const { id: tenantId } = req.params;
+        
+        // Find the admin user for this tenant
+        const adminUser = await prisma.user.findFirst({
+            where: { tenantId, role: 'ADMIN' }
+        });
+
+        if (!adminUser) {
+            return res.status(404).json(new ApiResponse(404, null, 'No ADMIN user found for this tenant to impersonate'));
+        }
+
+        if (!adminUser.firebaseUid) {
+            return res.status(400).json(new ApiResponse(400, null, 'Tenant admin does not have a Firebase UID'));
+        }
+
+        // Generate a custom Firebase token for that user
+        const customToken = await admin.auth().createCustomToken(adminUser.firebaseUid);
+
+        logger.info(`Super Admin generated impersonation token for tenant ${tenantId}`);
+        res.status(200).json(new ApiResponse(200, { token: customToken }, 'Impersonation token generated'));
+    } catch (error) {
+        next(error);
+    }
+};

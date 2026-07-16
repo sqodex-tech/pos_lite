@@ -9,7 +9,8 @@ const {
     getStockMovements,
     adjustStock,
     transferStock,
-    getInventoryStats
+    getInventoryStats,
+    bulkCreateItems
 } = require('../controllers/inventory.controller');
 const { tenantIsolation, validateStoreAccess } = require('../middleware/tenantIsolation.middleware');
 const validate = require('../middleware/validate.middleware');
@@ -28,6 +29,7 @@ router.use(validateStoreAccess);
 router.get('/stats', requireModuleAccess('inventory', 'view'), getInventoryStats);
 router.get('/', requireModuleAccess('inventory', 'view'), getItems);
 router.get('/:id', requireModuleAccess('inventory', 'view'), getItemById);
+router.post('/bulk', requireModuleAccess('inventory', 'create'), bulkCreateItems);
 router.post('/', requireModuleAccess('inventory', 'create'), validate(itemSchema), createItem);
 router.patch('/:id', requireModuleAccess('inventory', 'update'), validate(updateItemSchema), updateItem);
 router.delete('/:id', requireModuleAccess('inventory', 'delete'), deleteItem);

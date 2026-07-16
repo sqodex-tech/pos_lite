@@ -91,21 +91,21 @@ export default function Dashboard() {
     >
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <motion.div variants={item}>
-          <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-            Terminal Overview <span className="text-indigo-600">.json</span>
+          <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
+            Dashboard Overview
           </h2>
-          <p className="text-slate-500 dark:text-slate-400 mt-1 font-medium">Monitoring platform expansion for {user?.name || 'Super Admin'}</p>
+          <p className="text-slate-500 dark:text-slate-400 mt-1 font-medium">Welcome back, {user?.name || 'Super Admin'}</p>
         </motion.div>
         
         <motion.div variants={item} className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-[10px] font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-4 py-2 rounded-xl border border-indigo-100 dark:border-indigo-900/30 uppercase tracking-widest shadow-sm">
+          <div className="flex items-center gap-2 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-4 py-2 rounded-xl border border-indigo-100 dark:border-indigo-900/30 shadow-sm">
             <div className="w-1.5 h-1.5 bg-indigo-600 rounded-full animate-pulse" />
-            Live Link Active
+            System Online
           </div>
           <select 
             value={period}
             onChange={handlePeriodChange}
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-[10px] font-black uppercase tracking-widest p-2 outline-none shadow-sm focus:ring-2 focus:ring-indigo-500/20"
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold p-2 outline-none shadow-sm focus:ring-2 focus:ring-indigo-500/20"
           >
             <option value="7">Last 7 Days</option>
             <option value="30">Last 30 Days</option>
@@ -134,8 +134,8 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="mt-8">
-                <h3 className="text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-widest">{stat.name}</h3>
-                <p className="text-3xl font-black text-slate-900 dark:text-white mt-1 tracking-tight">{stat.value}</p>
+                <h3 className="text-slate-500 dark:text-slate-400 text-sm font-semibold">{stat.name}</h3>
+                <p className="text-3xl font-bold text-slate-900 dark:text-white mt-1 tracking-tight">{stat.value}</p>
               </div>
             </motion.div>
           );
@@ -146,8 +146,8 @@ export default function Dashboard() {
         <motion.div variants={item} className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm p-8">
           <div className="flex items-center justify-between mb-10">
             <div>
-              <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Revenue Trajectory</h3>
-              <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Growth Index: High</p>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Revenue Overview</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Platform gross revenue over time</p>
             </div>
           </div>
           <div className="h-80 relative flex flex-col justify-center">
@@ -202,8 +202,8 @@ export default function Dashboard() {
         </motion.div>
 
         <motion.div variants={item} className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm p-8">
-          <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Market Share</h3>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-10">Subscription Tier Distribution</p>
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight mb-2">Market Share</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-10">Subscription Tier Distribution</p>
           <div className="h-64 relative flex flex-col justify-center">
             {planDistribution.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-slate-400">
@@ -234,8 +234,8 @@ export default function Dashboard() {
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-2xl font-black text-slate-900 dark:text-white">{overview.activeSubscriptions}</span>
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Active</span>
+                  <span className="text-2xl font-bold text-slate-900 dark:text-white">{overview.activeSubscriptions}</span>
+                  <span className="text-xs font-semibold text-slate-500 uppercase">Active</span>
                 </div>
                 </>
             )}
@@ -247,9 +247,89 @@ export default function Dashboard() {
                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
                    <span className="text-xs font-bold text-slate-600 dark:text-slate-400">{plan.plan}</span>
                  </div>
-                 <span className="text-xs font-black text-slate-900 dark:text-white">{plan.percentage}%</span>
+                 <span className="text-sm font-bold text-slate-900 dark:text-white">{plan.percentage}%</span>
                </div>
              ))}
+          </div>
+        </motion.div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <motion.div variants={item} className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm p-8 relative overflow-hidden group">
+          <div className="absolute -right-10 -top-10 w-40 h-40 bg-indigo-100 dark:bg-indigo-500/20 rounded-full blur-3xl group-hover:bg-indigo-200 dark:group-hover:bg-indigo-500/30 transition-all duration-700"></div>
+          <div className="flex justify-between items-start mb-6">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Platform Uptime</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">Global Server Status</p>
+            </div>
+            <div className="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
+              <Zap className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center relative z-10">
+              <span className="text-sm font-medium text-slate-500">Uptime</span>
+              <span className="text-sm font-bold text-slate-900 dark:text-white">99.99%</span>
+            </div>
+            <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 relative z-10">
+              <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: '100%' }}></div>
+            </div>
+            <div className="flex justify-between items-center relative z-10">
+              <span className="text-sm font-medium text-slate-500">Active Instances</span>
+              <span className="text-sm font-bold text-slate-900 dark:text-white">4 / 4</span>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div variants={item} className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm p-8 relative overflow-hidden group">
+          <div className="absolute -right-10 -top-10 w-40 h-40 bg-violet-100 dark:bg-violet-500/20 rounded-full blur-3xl group-hover:bg-violet-200 dark:group-hover:bg-violet-500/30 transition-all duration-700"></div>
+          <div className="flex justify-between items-start mb-6">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Database Health</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">Cluster Performance</p>
+            </div>
+            <div className="p-2.5 bg-violet-500/20 text-violet-400 rounded-xl border border-violet-500/30">
+              <Activity className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-bold text-slate-400">Latency</span>
+              <span className="text-sm font-black text-emerald-400">24ms</span>
+            </div>
+            <div className="w-full bg-slate-800 rounded-full h-1.5">
+              <div className="bg-violet-500 h-1.5 rounded-full" style={{ width: '24%' }}></div>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-bold text-slate-400">Queries/sec</span>
+              <span className="text-sm font-black">1,204</span>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div variants={item} className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm p-8 relative overflow-hidden group">
+          <div className="absolute -right-10 -top-10 w-40 h-40 bg-amber-100 dark:bg-amber-500/20 rounded-full blur-3xl group-hover:bg-amber-200 dark:group-hover:bg-amber-500/30 transition-all duration-700"></div>
+          <div className="flex justify-between items-start mb-6">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">API Gateway</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">Request Routing</p>
+            </div>
+            <div className="p-2.5 bg-amber-500/20 text-amber-500 dark:text-amber-400 rounded-xl border border-amber-500/30 relative z-10">
+              <ArrowUpRight className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center relative z-10">
+              <span className="text-sm font-medium text-slate-500">Success Rate</span>
+              <span className="text-sm font-bold text-slate-900 dark:text-white">99.8%</span>
+            </div>
+            <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 relative z-10">
+              <div className="bg-amber-500 h-1.5 rounded-full" style={{ width: '99%' }}></div>
+            </div>
+            <div className="flex justify-between items-center relative z-10">
+              <span className="text-sm font-medium text-slate-500">Error Rate</span>
+              <span className="text-sm font-bold text-slate-900 dark:text-white">0.2%</span>
+            </div>
           </div>
         </motion.div>
       </div>
@@ -258,8 +338,8 @@ export default function Dashboard() {
         <motion.div variants={item} className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
           <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
              <div>
-               <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Recent Onboarding</h3>
-               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Latest subscription entities</p>
+               <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Recent Onboarding</h3>
+               <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mt-1">Latest subscription entities</p>
              </div>
              <button className="p-2 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20 rounded-xl transition-all">
                 <ArrowRight className="w-5 h-5" />
@@ -270,17 +350,17 @@ export default function Dashboard() {
               recentActivities.newSubscriptions.map((sub: any) => (
                 <div key={sub.id || sub._id || Math.random()} className="p-6 flex items-center justify-between group hover:bg-slate-50/50 dark:hover:bg-indigo-900/5 transition-all">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-indigo-50 dark:bg-slate-800 rounded-2xl flex items-center justify-center text-indigo-600 font-black border border-indigo-100 dark:border-slate-700">
+                    <div className="w-12 h-12 bg-indigo-50 dark:bg-slate-800 rounded-2xl flex items-center justify-center text-indigo-600 font-bold border border-indigo-100 dark:border-slate-700">
                       {(sub.tenantId?.name || 'T')[0]}
                     </div>
                     <div>
                       <p className="text-sm font-bold text-slate-900 dark:text-white">{sub.tenantId?.name || 'New Tenant'}</p>
-                      <p className="text-[10px] font-black text-indigo-500 uppercase tracking-tight">{sub.planId?.name || 'Standard Plan'}</p>
+                      <p className="text-xs font-semibold text-indigo-500">{sub.planId?.name || 'Standard Plan'}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs font-black text-slate-900 dark:text-white">Rs {sub.priceSnapshot?.amount || 0}</p>
-                    <p className="text-[10px] font-bold text-slate-400 flex items-center gap-1 justify-end mt-1">
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">Rs {sub.priceSnapshot?.amount || 0}</p>
+                    <p className="text-xs font-medium text-slate-400 flex items-center gap-1 justify-end mt-1">
                       <Clock className="w-3 h-3" />
                       {new Date(sub.createdAt).toLocaleDateString()}
                     </p>
@@ -298,8 +378,8 @@ export default function Dashboard() {
         <motion.div variants={item} className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
           <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
              <div>
-               <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Ledger Stream</h3>
-               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Live financial transactions</p>
+               <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Recent Revenue</h3>
+               <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mt-1">Live financial transactions</p>
              </div>
              <button className="p-2 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20 rounded-xl transition-all">
                 <TrendingUp className="w-5 h-5" />
@@ -310,17 +390,17 @@ export default function Dashboard() {
               recentActivities.billing.map((bill: any) => (
                 <div key={bill.id || bill._id || Math.random()} className="p-6 flex items-center justify-between group hover:bg-slate-50/50 dark:hover:bg-indigo-900/5 transition-all">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-emerald-50 dark:bg-slate-800 rounded-2xl flex items-center justify-center text-emerald-600 font-black border border-emerald-100 dark:border-slate-700">
+                    <div className="w-12 h-12 bg-emerald-50 dark:bg-slate-800 rounded-2xl flex items-center justify-center text-emerald-600 font-bold border border-emerald-100 dark:border-slate-700">
                       Rs 
                     </div>
                     <div>
                       <p className="text-sm font-bold text-slate-900 dark:text-white">Payment Received</p>
-                      <p className="text-[10px] font-black text-emerald-500 uppercase tracking-tight">{bill.tenantId?.name || 'Tenant'}</p>
+                      <p className="text-xs font-semibold text-emerald-500">{bill.tenantId?.name || 'Tenant'}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs font-black text-slate-900 dark:text-white">Rs {bill.amount.toLocaleString()}</p>
-                    <div className="inline-flex items-center px-2 py-0.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-[8px] font-black uppercase rounded-md border border-emerald-100 dark:border-emerald-900/30 mt-1">
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">Rs {bill.amount.toLocaleString()}</p>
+                    <div className="inline-flex items-center px-2 py-0.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold rounded-md border border-emerald-100 dark:border-emerald-900/30 mt-1">
                       Paid
                     </div>
                   </div>

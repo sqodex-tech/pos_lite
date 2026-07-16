@@ -49,6 +49,73 @@ const createItem = async (req, res, next) => {
     }
 };
 
+const bulkCreateItems = async (req, res, next) => {
+    try {
+        const prisma = require('../config/prisma');
+        const items = req.body.items || [];
+        
+        if (!Array.isArray(items) || items.length === 0) {
+            throw new ApiError(400, 'Please provide an array of items');
+        }
+
+        const activeSubscription = await prisma.subscription.findFirst({
+            where: {
+                tenantId: req.tenantId,
+                status: 'active',
+                endDate: { gte: new Date() }
+            },
+            include: { plan: true }
+        });
+
+        if (!activeSubscription) {
+            throw new ApiError(403, '⚠️ No Active Subscription! Please subscribe to a plan to create inventory items.');
+        }
+
+        const currentItemCount = await prisma.item.count({ 
+            where: {
+                tenantId: req.tenantId,
+                deletedAt: null
+            }
+        });
+
+        const limitsSnapshot = activeSubscription.limitsSnapshot || {};
+        const maxItems = limitsSnapshot.maxItems ?? activeSubscription.plan?.maxItems ?? 100;
+
+        if (currentItemCount + items.length > maxItems) {
+            const planName = activeSubscription.plan?.name || 'current plan';
+            throw new ApiError(403, `📦 Inventory Limit Reached! Adding ${items.length} items will exceed your limit of ${maxItems} items on your ${planName}.`);
+        }
+
+        const storeId = req.query.storeId || req.headers['x-store-id'] || req.body.storeId;
+        const userId = req.user?.id || req.body.userId;
+        
+        const createdItems = [];
+        const errors = [];
+
+        for (const itemData of items) {
+            try {
+                // Ensure name and category are strings, parse numbers correctly
+                const sanitizedData = {
+                    ...itemData,
+                    price: parseFloat(itemData.price || 0),
+                    cost: parseFloat(itemData.cost || 0),
+                    stock: parseInt(itemData.stock || 0),
+                    lowStockAlert: parseInt(itemData.lowStockAlert || 5)
+                };
+                const item = await inventoryService.createItem(req.tenantId, storeId, sanitizedData, userId);
+                createdItems.push(item);
+            } catch (err) {
+                errors.push({ name: itemData.name, error: err.message });
+            }
+        }
+
+        cache.delStartWith(`items_${req.tenantId}`);
+        return res.status(201).json(new ApiResponse(201, { created: createdItems.length, errors }, 'Bulk import completed'));
+    } catch (error) {
+        next(error);
+    }
+};
+
 const getItems = async (req, res, next) => {
     try {
         const { page = 1, limit = 20, search, storeId: queryStoreId } = req.query;
@@ -311,5 +378,6 @@ module.exports = {
     getStockMovements,
     adjustStock,
     transferStock,
-    getInventoryStats
+    getInventoryStats,
+    bulkCreateItems
 };

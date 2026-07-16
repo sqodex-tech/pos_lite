@@ -18,7 +18,8 @@ import {
     Store,
     TrendingUp,
     Users,
-    Zap
+    Zap,
+    Printer
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -27,7 +28,10 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { storesApi } from '@/lib/api/stores';
 import { transactionsApi } from '@/lib/api/transactions';
 import { inventoryApi } from '@/lib/api/inventory';
+import { reportsApi } from '@/lib/api/reports';
 import { Button } from '@/components/UI';
+import EndOfDayModal from '@/components/store/EndOfDayModal';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function TenantDashboard() {
     const { user } = usePermissions();
@@ -37,6 +41,9 @@ export default function TenantDashboard() {
     const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
     const [lowStockItems, setLowStockItems] = useState<any[]>([]);
     const [currentStore, setCurrentStore] = useState<any>(null);
+    const [chartData, setChartData] = useState<any[]>([]);
+    const [isEndOfDayOpen, setIsEndOfDayOpen] = useState(false);
+    const [printingTx, setPrintingTx] = useState<any>(null);
 
     const [dateFilter, setDateFilter] = useState('today');
     const [customStart, setCustomStart] = useState('');
@@ -85,7 +92,7 @@ export default function TenantDashboard() {
                 start.setHours(0, 0, 0, 0);
             }
 
-            const [statsRes, transRes, invRes, storeDetails] = await Promise.all([
+            const [statsRes, transRes, invRes, storeDetails, reportsRes] = await Promise.all([
                 storesApi.getStats(storeId, {
                     startDate: start.toISOString(),
                     endDate: end.toISOString()
@@ -103,14 +110,21 @@ export default function TenantDashboard() {
                     }
                 })),
                 transactionsApi.getAll(storeId, { limit: 5, startDate: start.toISOString(), endDate: end.toISOString() }).catch(() => ({ data: { data: [] } })),
-                inventoryApi.getAll(storeId, { limit: 5, status: 'active' }).catch(() => ({ data: { data: [] } })),
-                storesApi.getById(storeId).catch(() => ({ data: { data: null } }))
+                inventoryApi.getAll(storeId, { limit: 1000, status: 'active' }).catch(() => ({ data: { data: [] } })),
+                storesApi.getById(storeId).catch(() => ({ data: { data: null } })),
+                reportsApi.getProfitLoss({ storeId, startDate: start.toISOString(), endDate: end.toISOString() }).catch(() => ({ data: { data: null } }))
             ]);
 
             setStats(statsRes.data.data);
             setRecentTransactions(Array.isArray(transRes.data.data) ? transRes.data.data : []);
             setLowStockItems(Array.isArray(invRes.data.data) ? invRes.data.data.filter((i: any) => (i.stock || 0) <= (i.lowStockAlert || 5)) : []);
             setCurrentStore(storeDetails.data.data);
+            
+            if (reportsRes.data?.data?.chartData) {
+                setChartData(Object.values(reportsRes.data.data.chartData));
+            } else {
+                setChartData([]);
+            }
         } catch (error: any) {
             console.error('Dashboard load error:', error);
             toast.error('Failed to load dashboard data');
@@ -186,6 +200,14 @@ export default function TenantDashboard() {
                         )}
                     </div>
                     
+                    <Button 
+                        variant="outline" 
+                        onClick={() => setIsEndOfDayOpen(true)}
+                        className="rounded-2xl px-6 h-14 font-black text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                    >
+                        Z-Report
+                    </Button>
+
                     <Link href="/store/pos">
                         <Button className="rounded-2xl px-8 h-14 bg-primary hover:bg-primary-dark text-white font-black gap-2 shadow-xl shadow-primary/20 hover:shadow-2xl transition-all group">
                             <Zap className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" />
@@ -232,6 +254,48 @@ export default function TenantDashboard() {
                 />
             </div>
 
+            {/* Sales Trend Chart */}
+            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 border border-slate-200/60 dark:border-slate-700/60 shadow-xl overflow-hidden">
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h2 className="text-xl font-black text-slate-900 dark:text-white">Sales & Purchases Trend</h2>
+                        <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">Revenue Flow Over Time</p>
+                    </div>
+                </div>
+                <div className="h-[300px] w-full">
+                    {chartData && chartData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                    </linearGradient>
+                                    <linearGradient id="colorPurchases" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3}/>
+                                        <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.1)" />
+                                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} dy={10} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} dx={-10} tickFormatter={(val) => `Rs ${val}`} />
+                                <Tooltip 
+                                    contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' }}
+                                    formatter={(value: number) => [`Rs ${value.toFixed(2)}`, undefined]}
+                                />
+                                <Area type="monotone" dataKey="sales" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorSales)" name="Sales" />
+                                <Area type="monotone" dataKey="purchases" stroke="#f43f5e" strokeWidth={3} fillOpacity={1} fill="url(#colorPurchases)" name="Purchases" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                            <Activity className="w-12 h-12 mb-3 opacity-20" />
+                            <p className="font-bold">No trend data available for this period</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Recent Transactions */}
                 <div className="lg:col-span-2 space-y-6">
@@ -256,6 +320,7 @@ export default function TenantDashboard() {
                                         <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Time</th>
                                         <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Method</th>
                                         <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Amount</th>
+                                        <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
@@ -278,10 +343,19 @@ export default function TenantDashboard() {
                                             <td className="px-6 py-4 text-right">
                                                 <p className="text-sm font-black text-slate-900 dark:text-white">Rs {(tx.total || tx.totalAmount || 0).toFixed(2)}</p>
                                             </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <button 
+                                                    onClick={() => setPrintingTx(tx)}
+                                                    className="p-2 bg-slate-100 hover:bg-primary/10 text-slate-500 hover:text-primary rounded-lg transition-colors"
+                                                    title="Print Receipt"
+                                                >
+                                                    <Printer className="w-4 h-4" />
+                                                </button>
+                                            </td>
                                         </tr>
                                     )) : (
                                         <tr>
-                                            <td colSpan={4} className="px-6 py-12 text-center">
+                                            <td colSpan={5} className="px-6 py-12 text-center">
                                                 <div className="flex flex-col items-center">
                                                     <ShoppingCart className="w-12 h-12 text-slate-200 mb-2" />
                                                     <p className="text-slate-400 font-medium">No transactions found today</p>
@@ -369,25 +443,76 @@ export default function TenantDashboard() {
                     </div>
                 </div>
             </div>
+
+            <EndOfDayModal 
+                isOpen={isEndOfDayOpen} 
+                onClose={() => setIsEndOfDayOpen(false)} 
+                storeId={currentStore?.id} 
+            />
+
+            {/* Print Receipt Modal / Layout */}
+            {printingTx && (
+                <div className="fixed inset-0 z-[200] bg-white flex flex-col print:bg-white print:static print:z-auto">
+                    <div className="p-4 flex justify-between items-center bg-slate-100 border-b no-print">
+                        <h2 className="font-bold">Print Receipt</h2>
+                        <div className="flex gap-2">
+                            <Button variant="outline" onClick={() => setPrintingTx(null)}>Cancel</Button>
+                            <Button onClick={() => window.print()} className="bg-primary text-white">Print</Button>
+                        </div>
+                    </div>
+                    <div className="flex-1 flex justify-center p-8 print:p-0 pos-cart-container" style={{ width: '100%' }}>
+                        <div className="w-[80mm] bg-white text-black p-4 text-xs mx-auto print:mx-0 print:p-0">
+                            <div className="text-center mb-4">
+                                <h1 className="font-black text-lg uppercase">{currentStore?.name || 'Store'}</h1>
+                                <p>Receipt: #{printingTx.transactionNumber?.slice(-6) || 'N/A'}</p>
+                                <p>{new Date(printingTx.createdAt).toLocaleString()}</p>
+                            </div>
+                            <div className="border-t border-b border-dashed border-black py-2 mb-2">
+                                {printingTx.items?.map((item: any, i: number) => (
+                                    <div key={i} className="flex justify-between mb-1">
+                                        <span className="truncate pr-2">{item.quantity}x {item.name || item.product?.name || 'Item'}</span>
+                                        <span className="font-bold">{(item.price * item.quantity).toFixed(2)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="flex justify-between font-black text-sm">
+                                <span>TOTAL</span>
+                                <span>Rs {(printingTx.total || printingTx.totalAmount || 0).toFixed(2)}</span>
+                            </div>
+                            <div className="text-center mt-4">
+                                <p>Thank you for shopping!</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
 
 function DashboardStatCard({ title, value, subtitle, icon, color, trend, alert, loading }: any) {
     const colorVariants: any = {
-        emerald: "bg-emerald-500 shadow-emerald-500/20",
-        blue: "bg-blue-500 shadow-blue-500/20",
-        purple: "bg-purple-500 shadow-purple-500/20",
-        amber: "bg-amber-500 shadow-amber-500/20",
-        rose: "bg-rose-500 shadow-rose-500/20"
+        emerald: "bg-emerald-500 shadow-emerald-500/30",
+        blue: "bg-blue-500 shadow-blue-500/30",
+        purple: "bg-purple-500 shadow-purple-500/30",
+        amber: "bg-amber-500 shadow-amber-500/30",
+        rose: "bg-rose-500 shadow-rose-500/30"
+    };
+
+    const gradientBg: any = {
+        emerald: "from-emerald-500/10 to-transparent",
+        blue: "from-blue-500/10 to-transparent",
+        purple: "from-purple-500/10 to-transparent",
+        amber: "from-amber-500/10 to-transparent",
+        rose: "from-rose-500/10 to-transparent"
     };
 
     return (
         <motion.div
             whileHover={{ y: -5 }}
-            className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-7 border border-slate-200/60 dark:border-slate-700/60 shadow-xl relative overflow-hidden group"
+            className={`bg-white dark:bg-slate-900 rounded-[2.5rem] p-7 border border-slate-200/60 dark:border-slate-700/60 shadow-xl relative overflow-hidden group bg-gradient-to-br ${gradientBg[color]}`}
         >
-            <div className={`w-14 h-14 ${colorVariants[color]} rounded-2xl flex items-center justify-center text-white mb-6 shadow-xl transition-transform group-hover:scale-110 duration-500`}>
+            <div className={`w-14 h-14 ${colorVariants[color]} rounded-2xl flex items-center justify-center text-white mb-6 shadow-xl transition-transform group-hover:scale-110 group-hover:rotate-3 duration-500`}>
                 {icon}
             </div>
 

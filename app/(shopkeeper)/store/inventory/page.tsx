@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Package, Plus, Search, Edit, Trash2, TrendingDown, AlertCircle, Banknote, Download, Grid, List, CheckSquare, CalendarDays, TimerOff } from 'lucide-react';
+import { Package, Plus, Search, Edit, Trash2, TrendingDown, AlertCircle, Banknote, Download, Grid, List, CheckSquare, CalendarDays, TimerOff, Upload } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { inventoryApi, Item } from '@/lib/api/inventory';
@@ -11,6 +11,7 @@ import { unitsApi, Unit } from '@/lib/api/units';
 import { Button, AccessDenied } from '@/components/UI';
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner';
 import ItemFormModal from '@/components/inventory/ItemFormModal';
+import ImportCsvModal from '@/components/store/ImportCsvModal';
 import SearchableSelect from '@/components/inventory/SearchableSelect';
 import AdvancedFilters, { FilterState } from '@/components/inventory/AdvancedFilters';
 import BulkActions from '@/components/inventory/BulkActions';
@@ -27,6 +28,7 @@ export default function InventoryPage() {
     const [page, setPage] = useState(1);
     const [meta, setMeta] = useState({ total: 0, page: 1, totalPages: 1, hasMore: false });
     const [showModal, setShowModal] = useState(false);
+    const [showImportModal, setShowImportModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState<Item | null>(null);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -274,6 +276,14 @@ export default function InventoryPage() {
                 <div className="flex gap-3">
                     {canManage && (
                         <>
+                            <Button
+                                onClick={() => setShowImportModal(true)}
+                                variant="outline"
+                                className="gap-2 border-primary text-primary hover:bg-primary/5"
+                            >
+                                <Upload className="w-5 h-5" />
+                                Import CSV
+                            </Button>
                             <Button
                                 onClick={() => handleExport(items.map(i => i.id))}
                                 variant="outline"
@@ -666,20 +676,33 @@ export default function InventoryPage() {
                 </AnimatePresence>
             )}
 
-            {/* Modal */}
-            {showModal && (
-                <ItemFormModal
-                    item={selectedItem}
-                    categories={categories}
-                    brands={brands}
-                    units={units}
-                    onClose={() => setShowModal(false)}
-                    onSuccess={() => {
-                        fetchItems();
-                        setShowModal(false);
-                    }}
-                />
-            )}
+            {/* Modals */}
+            <AnimatePresence>
+                {showModal && (
+                    <ItemFormModal
+                        item={selectedItem}
+                        categories={categories}
+                        brands={brands}
+                        units={units}
+                        onClose={() => setShowModal(false)}
+                        onSuccess={() => {
+                            fetchItems();
+                            setShowModal(false);
+                        }}
+                    />
+                )}
+                {showImportModal && (
+                    <ImportCsvModal
+                        isOpen={showImportModal}
+                        onClose={() => setShowImportModal(false)}
+                        onSuccess={() => {
+                            fetchItems();
+                            setShowImportModal(false);
+                        }}
+                        storeId={localStorage.getItem('storeId') || ''}
+                    />
+                )}
+            </AnimatePresence>
         </div>
     );
 }

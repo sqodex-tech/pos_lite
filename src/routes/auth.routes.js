@@ -12,7 +12,7 @@ const router = express.Router();
 router.post('/tenant-register', strictLimiter, validate(registerTenantSchema), registerTenant);
 
 router.post('/register', validate(registerSchema), registerUser);
-router.post('/login', validate(loginSchema), loginUser);
+router.post('/login', loginUser);
 router.post('/admin-login', validate(loginSchema), adminLogin);
 router.post('/refresh-token', refreshToken);
 router.post('/google', googleAuth);

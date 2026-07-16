@@ -6,6 +6,54 @@ const logger = require('../utils/logger');
 const { getRolePermissions } = require('../utils/rolePermissions');
 const jwt = require('jsonwebtoken');
 
+const assignFreePlan = async (tx, tenantId) => {
+    const freePlan = await tx.plan.findFirst({
+        where: { price: 0 }
+    });
+
+    if (freePlan) {
+        const startDate = new Date();
+        const duration = freePlan.durationInDays || 30;
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + duration);
+
+        await tx.subscription.create({
+            data: {
+                tenantId,
+                planId: freePlan.id,
+                startDate,
+                endDate,
+                autoRenew: true,
+                priceSnapshot: {
+                    amount: 0,
+                    currency: 'USD',
+                    durationInDays: duration
+                },
+                limitsSnapshot: {
+                    maxUsers: freePlan.maxUsers,
+                    maxItems: freePlan.maxItems,
+                    maxBranches: freePlan.maxBranches
+                },
+                isTrial: freePlan.isTrialPlan,
+                trialEndsAt: freePlan.isTrialPlan ? endDate : null,
+                status: 'active',
+                paymentStatus: 'paid',
+                nextPaymentDate: endDate
+            }
+        });
+
+        await tx.tenant.update({
+            where: { id: tenantId },
+            data: {
+                subscriptionPlanId: freePlan.id,
+                subscriptionStart: startDate,
+                nextBillingDate: endDate,
+                hasUsedTrial: freePlan.isTrialPlan ? true : false
+            }
+        });
+    }
+};
+
 const registerUser = async (req, res, next) => {
     try {
         const { name, email, password, role, tenantId } = req.body;
@@ -136,6 +184,8 @@ const registerTenant = async (req, res, next) => {
                 }
             });
 
+            await assignFreePlan(tx, tenant.id);
+
             const adminUser = await tx.user.create({
                 data: {
                     firebaseUid: firebaseRecord.uid,
@@ -233,6 +283,8 @@ const googleAuth = async (req, res, next) => {
                         status: 'active'
                     }
                 });
+
+                await assignFreePlan(tx, tenant.id);
 
                 const adminUser = await tx.user.create({
                     data: {

@@ -20,7 +20,7 @@ export const authApi = {
     login: (token: string) => api.post('/auth/login', {}, { headers: { Authorization: `Bearer ${token}` } }),
     googleLogin: (token: string) => api.post('/auth/google', {}, { headers: { Authorization: `Bearer ${token}` } }),
 
-    register: (data: RegisterData) => api.post('/auth/register', data),
+    register: (data: RegisterData) => api.post('/auth/tenant-register', data),
 
     logout: () => {
         if (typeof window !== 'undefined') {
